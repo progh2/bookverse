@@ -23,4 +23,4 @@ export const app = initializeApp(
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
 export const db = getFirestore(app)
-export const functions = getFunctions(app, 'us-central1')
+export const functions = getFunctions(app, 'asia-northeast3')

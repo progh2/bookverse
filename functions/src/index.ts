@@ -4,7 +4,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { setGlobalOptions } from 'firebase-functions/v2'
 
 initializeApp()
-setGlobalOptions({ region: 'us-central1', maxInstances: 10 })
+setGlobalOptions({ region: 'asia-northeast3', maxInstances: 10 })
 
 const db = getFirestore()
 
