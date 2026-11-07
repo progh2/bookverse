@@ -9,7 +9,7 @@ import { state } from '../state'
 import { navigate } from '../router'
 import { openBookPost } from './BookPostModal'
 import { GENRE_COLORS, type Book, type Student } from '../types'
-import { characterSvg } from '../characters'
+import { characterIdFor, characterSvg } from '../characters'
 
 const CLUSTER_SCALE = 0.7 // 학생 한 명의 별자리를 원 위에 올릴 때의 축소 비율
 const ROTATE_SPEED = 0.025 // rad/s — 한 바퀴 약 4분
@@ -111,7 +111,7 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     // 원 바깥쪽으로 캐릭터 → 그 바깥에 닉네임 순서로 놓는다(원이 돌아도 항상 바깥을 향함)
     const avatarPos = center.clone().setLength(radius + 3.0)
     avatarPos.z = center.z
-    avatars.push({ svg: characterSvg(student?.character, 200), position: avatarPos, size: 1.15 * labelScale })
+    avatars.push({ svg: characterSvg(characterIdFor(student), 200), position: avatarPos, size: 1.15 * labelScale })
     const labelPos = center.clone().setLength(radius + 3.0 + 1.3 * labelScale)
     labelPos.z = center.z
     labels.push({ text: student?.nickname ?? '알 수 없음', position: labelPos })

@@ -106,3 +106,12 @@ export function readerTitle(starCount: number): string {
   if (starCount >= 1) return '첫 별을 띄운 여행자'
   return '새내기 별지기'
 }
+
+/** 학생이 직접 고른 캐릭터가 없으면 학생 id로 정해지는 기본 캐릭터(학급 성운이 단조롭지 않게). */
+export function characterIdFor(student: { id: string; character?: string } | undefined): CharacterId {
+  if (student?.character && CHARACTERS.some((c) => c.id === student.character)) return student.character as CharacterId
+  if (!student) return DEFAULT_CHARACTER
+  let h = 0
+  for (const ch of student.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return CHARACTERS[h % CHARACTERS.length].id
+}

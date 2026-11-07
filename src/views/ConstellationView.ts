@@ -10,7 +10,7 @@ import { openBookPost } from './BookPostModal'
 import { openConstellationEditor } from './ConstellationEditor'
 import type { Book } from '../types'
 import { saveSession } from '../lib/session'
-import { CHARACTERS, characterSpec, characterSvg, readerTitle } from '../characters'
+import { CHARACTERS, characterIdFor, characterSvg, readerTitle } from '../characters'
 import { setCharacter } from '../lib/students'
 
 export async function renderConstellation(container: HTMLElement): Promise<() => void> {
@@ -80,7 +80,7 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
         <span>내 프로필</span>
         <button id="edit-nickname" class="hud-icon-btn" title="닉네임 수정">✏️</button>
       </div>
-      <div class="profile-character">${characterSvg(student.character, 180)}</div>
+      <div class="profile-character">${characterSvg(characterIdFor(student), 180)}</div>
       <div class="profile-name">${escapeHtml(student.nickname)}</div>
       <div class="profile-sub">${templateLabel(student.constellationTemplate)}</div>
       <span class="profile-title">${readerTitle(currentBooks.length)}</span>
@@ -115,7 +115,7 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
   }
 
   function openCharacterPicker() {
-    const current = characterSpec(state.student!.character).id
+    const current = characterIdFor(state.student!)
     const backdrop = document.createElement('div')
     backdrop.className = 'modal-backdrop'
     backdrop.innerHTML = `
