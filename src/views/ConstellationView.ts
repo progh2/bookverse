@@ -42,6 +42,11 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
   })
 
   let currentBooks: Book[] = []
+  let rotationLocked = true
+
+  function toggle3dButtonLabel(): string {
+    return rotationLocked ? '🌀 3D로 보기' : '🔒 고정 보기'
+  }
 
   async function refresh() {
     currentBooks = await listBooks(state.session!.classCode, state.session!.studentId)
@@ -58,6 +63,7 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
         <a href="#/class" style="color:var(--line-blue)">학급 성운 보기 →</a>
         <a href="#/board" style="color:var(--line-blue)">게시판 →</a>
         <button id="open-editor" class="hud-icon-btn" style="text-decoration:underline">🪄 별자리 편집</button>
+        <button id="toggle-3d" class="hud-icon-btn" style="text-decoration:underline">${toggle3dButtonLabel()}</button>
       </div>
     `
     hud.querySelector('#edit-nickname')!.addEventListener('click', openNicknameEditor)
@@ -66,6 +72,12 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
         state.student = await getStudent(state.session!.classCode, state.session!.studentId)
         await refresh()
       })
+    })
+    hud.querySelector('#toggle-3d')!.addEventListener('click', () => {
+      rotationLocked = !rotationLocked
+      scene.setRotationLocked(rotationLocked)
+      const btn = hud.querySelector('#toggle-3d')
+      if (btn) btn.textContent = toggle3dButtonLabel()
     })
   }
 

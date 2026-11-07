@@ -27,6 +27,7 @@ export class StarScene {
   private disposed = false
   private container: HTMLElement
   private resizeObserver: ResizeObserver
+  private initialCameraPosition: THREE.Vector3
 
   constructor(container: HTMLElement, private opts: StarSceneOptions = {}) {
     this.container = container
@@ -35,6 +36,7 @@ export class StarScene {
     const { clientWidth: w, clientHeight: h } = container
     this.camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 500)
     this.camera.position.set(0, 2, 16)
+    this.initialCameraPosition = this.camera.position.clone()
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -45,6 +47,9 @@ export class StarScene {
     this.controls.enableDamping = true
     this.controls.minDistance = 4
     this.controls.maxDistance = 80
+    // 기본값: 정면 고정 뷰(회전/패닝 비활성화). 사용자가 토글 버튼을 눌러야 자유 회전(3D) 모드가 된다.
+    this.controls.enableRotate = false
+    this.controls.enablePan = false
 
     this.scene.add(new THREE.AmbientLight(0x8fb4ff, 0.6))
 
@@ -92,6 +97,22 @@ export class StarScene {
       this.scene.add(line)
       this.lines.push(line)
     }
+  }
+
+  /** 회전/패닝을 잠그면 정면 고정 뷰로, 풀면 자유 회전(3D) 모드로 전환한다. */
+  setRotationLocked(locked: boolean) {
+    this.controls.enableRotate = !locked
+    this.controls.enablePan = !locked
+    if (locked) {
+      // 고정 뷰로 돌아갈 때는 생성 시점의 정면 각도로 카메라를 리셋
+      this.camera.position.copy(this.initialCameraPosition)
+      this.controls.target.set(0, 0, 0)
+      this.controls.update()
+    }
+  }
+
+  isRotationLocked(): boolean {
+    return !this.controls.enableRotate
   }
 
   private handleClick = (event: MouseEvent) => {
