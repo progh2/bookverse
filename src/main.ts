@@ -1,4 +1,5 @@
 import './style.css'
+import { mountCosmicBackground } from './cosmicBackground'
 import { registerRoute, setOutlet } from './router'
 import { renderLanding } from './views/LandingView'
 import { renderAuth } from './views/AuthView'
@@ -8,6 +9,8 @@ import { renderClassNebula } from './views/ClassNebulaView'
 import { renderBoard } from './views/BoardView'
 import { renderTeacher } from './views/TeacherView'
 import { renderRanking } from './views/RankingView'
+
+mountCosmicBackground()
 
 const app = document.getElementById('app')!
 app.innerHTML = `

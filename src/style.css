@@ -424,3 +424,68 @@ textarea { min-height: 70px; resize: vertical; }
   padding-right: 8px;
 }
 .ranking-me strong { color: var(--star-yellow); }
+
+/* ===== 전역 우주 배경(고정) =====
+   body의 직계 자식(#app보다 앞)으로 한 번만 마운트되어 모든 화면 뒤에 깔린다.
+   main#outlet은 화면전환 때 transform/perspective가 걸리지만, #cosmic-bg는
+   #app과 같은 레벨의 형제 요소이고 음수 z-index를 쓰므로, #app 내부의
+   stacking context와 무관하게 항상 맨 뒤에 그려진다. */
+#cosmic-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, var(--bg-soft) 0%, var(--bg) 60%);
+}
+
+.cosmic-glows {
+  position: absolute;
+  inset: 0;
+}
+
+.cosmic-glow {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--glow-color) 0%, transparent 72%);
+  opacity: var(--glow-opacity, 0.12);
+  filter: blur(12px);
+  animation-name: cosmic-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+.cosmic-stars {
+  position: absolute;
+  inset: 0;
+}
+
+.cosmic-star {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px 1px rgba(255, 255, 255, 0.6);
+  opacity: var(--max-opacity, 0.8);
+  animation-name: cosmic-twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes cosmic-twinkle {
+  0%, 100% { opacity: var(--max-opacity, 0.8); }
+  50% { opacity: 0.08; }
+}
+
+@keyframes cosmic-drift {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  33% { transform: translate(calc(-50% + 3vmin), calc(-50% - 2vmin)) scale(1.15); }
+  66% { transform: translate(calc(-50% - 2vmin), calc(-50% + 3vmin)) scale(0.9); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-star, .cosmic-glow { animation: none !important; }
+}
