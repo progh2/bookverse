@@ -103,14 +103,15 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     }
 
     const labelPos = center.clone()
-    labelPos.setLength(radius + 3.2)
+    labelPos.setLength(radius + 3.8)
     labelPos.z = center.z
     labels.push({ text: student?.nickname ?? '알 수 없음', position: labelPos })
   })
 
   scene.setStars(entries)
   scene.setConnections(solidPairs)
-  scene.setLabels(labels)
+  // 원이 클수록 카메라가 멀어져 글씨가 작아지므로 그만큼 이름표를 키운다
+  scene.setLabels(labels, Math.max(1, (1.95 * (radius + 4)) / 24))
 
   // 같은 문장에 밑줄 친 서로 다른 학생끼리는 연한 점선으로 느슨하게 잇는다
   const normalize = (s: string) => s.replace(/\s+/g, '').replace(/["'“”‘’.,!?]/g, '')

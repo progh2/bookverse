@@ -125,15 +125,21 @@ export class StarScene {
     }
   }
 
-  /** 서로 다른 별자리를 느슨하게 잇는 연한 점선(예: 같은 문장에 밑줄 친 친구). */
+  /**
+   * 서로 다른 별자리를 느슨하게 잇는 연한 점선(예: 같은 문장에 밑줄 친 친구).
+   * 원형 배치에서 직선으로 그으면 화면을 가로지르는 줄이 어지럽게 겹쳐서,
+   * 은하 중심 쪽으로 살짝 휘는 곡선으로 그린다.
+   */
   setDashedConnections(pairs: [THREE.Vector3, THREE.Vector3][]) {
     for (const line of this.dashedLines) this.root.remove(line)
     this.dashedLines = []
     const material = new THREE.LineDashedMaterial({
-      color: 0xffd66b, transparent: true, opacity: 0.35, dashSize: 0.35, gapSize: 0.45,
+      color: 0xffd66b, transparent: true, opacity: 0.22, dashSize: 0.4, gapSize: 0.6,
     })
     for (const [a, b] of pairs) {
-      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), material)
+      const control = a.clone().add(b).multiplyScalar(0.5 * 0.45)
+      const points = new THREE.QuadraticBezierCurve3(a, control, b).getPoints(32)
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material)
       line.computeLineDistances() // 점선은 선 길이 정보가 있어야 그려진다
       this.root.add(line)
       this.dashedLines.push(line)
@@ -141,7 +147,7 @@ export class StarScene {
   }
 
   /** 별자리 이름표(학생 닉네임 등). 스프라이트라 항상 똑바로 카메라를 향한다. */
-  setLabels(labels: StarLabel[]) {
+  setLabels(labels: StarLabel[], scale = 1) {
     for (const label of this.labels) {
       this.root.remove(label)
       label.material.map?.dispose()
@@ -150,6 +156,7 @@ export class StarScene {
     this.labels = []
     for (const { text, position } of labels) {
       const sprite = makeTextSprite(text)
+      sprite.scale.multiplyScalar(scale)
       sprite.position.copy(position)
       this.root.add(sprite)
       this.labels.push(sprite)
