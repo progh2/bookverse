@@ -11,6 +11,9 @@
 
 * { box-sizing: border-box; }
 
+/* .badge·.suggest-box처럼 display를 지정한 요소도 hidden 속성이면 확실히 숨긴다 */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
