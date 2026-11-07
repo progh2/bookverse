@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { TemplateId, ZodiacSign, FamousConstellationId, StarPosition } from '../types'
+import type { TemplateId, ZodiacSign, FamousConstellationId, StarLine, StarPosition } from '../types'
 
 const ZODIAC_SEEDS: Record<ZodiacSign, number> = {
   aries: 1, taurus: 2, gemini: 3, cancer: 4, leo: 5, virgo: 6,
@@ -148,13 +148,59 @@ export function layoutStars(
   return positions
 }
 
-/** 학급 성운: 학생마다 다른 중심점 주변에 그 학생의 별들을 뭉쳐 배치한다. */
+/** 학급 성운 원의 반지름. 학생 수가 많을수록 별자리끼리 겹치지 않게 넓힌다. */
+export function nebulaRingRadius(total: number): number {
+  return Math.max(9, total * 0.85)
+}
+
+/** 학급 성운: 학생마다의 별자리를 한 원 위에 고르게 둘러 배치한다(가운데는 은하 중심 빛). */
 export function layoutClusterCenter(index: number, total: number): THREE.Vector3 {
   const rand = mulberry32(index * 733 + 11)
-  const angle = (index / Math.max(total, 1)) * Math.PI * 2
-  const radius = 6 + (total > 6 ? Math.floor(index / 6) * 7 : 0)
-  const x = Math.cos(angle) * radius + (rand() - 0.5) * 2
-  const y = Math.sin(angle) * radius + (rand() - 0.5) * 2
-  const z = (rand() - 0.5) * 4
+  const angle = (index / Math.max(total, 1)) * Math.PI * 2 + Math.PI / 2
+  const radius = nebulaRingRadius(total)
+  const x = Math.cos(angle) * radius
+  const y = Math.sin(angle) * radius
+  const z = (rand() - 0.5) * 1.5
   return new THREE.Vector3(x, y, z)
+}
+
+/**
+ * 학생이 직접 선을 이은 적이 없을 때 쓰는 기본 연결선.
+ * 템플릿 윤곽점끼리의 연결을 그대로 쓰고, 그 연결에 끼지 못한 별(책이 윤곽점보다 많거나
+ * 템플릿 연결이 끊긴 경우)은 가장 가까운 이미 연결된 별에 붙여 하나의 별자리로 이어지게 한다.
+ */
+export function defaultStarLines(
+  templateId: TemplateId | null,
+  bookIds: string[],
+  positions: { x: number; y: number }[],
+): StarLine[] {
+  const n = bookIds.length
+  if (n < 2) return []
+  const tpl = templateId ?? 'capricorn'
+  const baseCount = Math.min(n, getTemplateBasePoints(tpl).length)
+
+  const pairs: [number, number][] = []
+  const connected = new Set<number>()
+  for (const [i, j] of getTemplateConnections(tpl)) {
+    if (i < baseCount && j < baseCount) {
+      pairs.push([i, j])
+      connected.add(i)
+      connected.add(j)
+    }
+  }
+  if (connected.size === 0) connected.add(0)
+
+  for (let k = 0; k < n; k++) {
+    if (connected.has(k)) continue
+    let nearest = -1
+    let best = Infinity
+    for (const c of connected) {
+      const d = Math.hypot(positions[k].x - positions[c].x, positions[k].y - positions[c].y)
+      if (d < best) { best = d; nearest = c }
+    }
+    pairs.push([nearest, k])
+    connected.add(k)
+  }
+
+  return pairs.map(([i, j]) => ({ a: bookIds[i], b: bookIds[j] }))
 }

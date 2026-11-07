@@ -1,6 +1,6 @@
 import type { Book, Student, StarLine, StarPosition, TemplateId } from '../types'
 import {
-  TEMPLATE_OPTIONS, getTemplateBasePoints, getTemplateConnections, layoutStars,
+  TEMPLATE_OPTIONS, defaultStarLines, getTemplateBasePoints, getTemplateConnections, layoutStars,
 } from '../three/constellationLayout'
 import { saveStarLines, saveStarPositions, setConstellationTemplate } from '../lib/students'
 
@@ -79,6 +79,9 @@ export function openConstellationEditor(
   const savedPositions = student.starPositions ?? {}
   const bookIds = new Set(books.map((b) => b.id))
   let currentLines: StarLine[] = (student.starLines ?? []).filter((l) => bookIds.has(l.a) && bookIds.has(l.b))
+  // 한 번도 선을 이은 적 없는 학생은 템플릿 기본 선에서 시작한다(직접 고치기 전까지는 템플릿을 바꾸면 같이 바뀜)
+  const useAutoLines = student.starLines === undefined
+  let linesTouched = false
   let mode: 'move' | 'link' = 'move'
   let selectedId: string | null = null
 
@@ -135,7 +138,13 @@ export function openConstellationEditor(
     }
   }
 
+  function applyAutoLines(templateId: TemplateId) {
+    if (!useAutoLines || linesTouched) return
+    currentLines = defaultStarLines(templateId, books.map((b) => b.id), books.map((b) => currentPositions.get(b.id)!))
+  }
+
   function toggleLine(a: string, b: string) {
+    linesTouched = true
     const idx = currentLines.findIndex((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a))
     if (idx >= 0) currentLines.splice(idx, 1)
     else currentLines.push({ a, b })
@@ -217,12 +226,14 @@ export function openConstellationEditor(
   }
 
   rebuildPositions(student.constellationTemplate)
+  applyAutoLines(student.constellationTemplate)
   drawGuide(student.constellationTemplate)
   renderHandles()
 
   templateSelect.addEventListener('change', () => {
     const templateId = templateSelect.value as TemplateId
     rebuildPositions(templateId)
+    applyAutoLines(templateId)
     renderHandles()
     redraw()
   })
@@ -230,6 +241,7 @@ export function openConstellationEditor(
   backdrop.querySelector('#mode-move')!.addEventListener('click', () => setMode('move'))
   backdrop.querySelector('#mode-link')!.addEventListener('click', () => setMode('link'))
   backdrop.querySelector('#clear-lines')!.addEventListener('click', () => {
+    linesTouched = true
     currentLines = []
     selectedId = null
     redraw()

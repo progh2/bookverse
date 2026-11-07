@@ -1,5 +1,5 @@
 import { StarScene } from '../three/StarScene'
-import { layoutStars, templateLabel } from '../three/constellationLayout'
+import { defaultStarLines, layoutStars, templateLabel } from '../three/constellationLayout'
 import { listBooks } from '../lib/books'
 import { getStudent } from '../lib/students'
 import { getAccount, renameAccount } from '../lib/accounts'
@@ -56,7 +56,10 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     scene.setStars(currentBooks.map((book, i) => ({ book, position: positions[i] })))
 
     const positionByBookId = new Map(currentBooks.map((book, i) => [book.id, positions[i]]))
-    const connectionPairs = (state.student!.starLines ?? [])
+    // 직접 이은 적이 없으면(starLines 없음) 템플릿 모양대로 기본 선을 보여준다. 빈 배열은 "선 없음"을 고른 것
+    const lines = state.student!.starLines
+      ?? defaultStarLines(state.student!.constellationTemplate, currentBooks.map((b) => b.id), positions)
+    const connectionPairs = lines
       .map(({ a, b }) => [positionByBookId.get(a), positionByBookId.get(b)] as const)
       .filter((pair): pair is [import('three').Vector3, import('three').Vector3] => !!pair[0] && !!pair[1])
     scene.setConnections(connectionPairs)

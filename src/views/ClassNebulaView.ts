@@ -1,5 +1,8 @@
+import type * as THREE from 'three'
 import { StarScene } from '../three/StarScene'
-import { layoutStars, layoutClusterCenter } from '../three/constellationLayout'
+import {
+  defaultStarLines, layoutClusterCenter, layoutStars, nebulaRingRadius,
+} from '../three/constellationLayout'
 import { listClassBooks } from '../lib/books'
 import { listStudents } from '../lib/students'
 import { state } from '../state'
@@ -7,11 +10,15 @@ import { navigate } from '../router'
 import { openBookDetail } from './BookDetailModal'
 import { GENRE_COLORS, type Book, type Student } from '../types'
 
+const CLUSTER_SCALE = 0.7 // 학생 한 명의 별자리를 원 위에 올릴 때의 축소 비율
+const ROTATE_SPEED = 0.025 // rad/s — 한 바퀴 약 4분
+
 export async function renderClassNebula(container: HTMLElement): Promise<() => void> {
   if (!state.session) {
     navigate('/auth')
     return () => {}
   }
+  const session = state.session
 
   container.innerHTML = `
     <div class="view">
@@ -26,13 +33,32 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   const hud = container.querySelector<HTMLElement>('#hud')!
   const legend = container.querySelector<HTMLElement>('#legend')!
 
-  let books: Book[] = []
-  let students: Student[] = []
-  const session = state.session
+  let books: Book[]
+  let students: Student[]
+  try {
+    ;[books, students] = await Promise.all([
+      listClassBooks(session.classCode),
+      listStudents(session.classCode),
+    ])
+  } catch (err) {
+    hud.innerHTML = `<p class="error-text">학급 성운을 불러오지 못했어요: ${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`
+    return () => {}
+  }
+
+  const byStudent = new Map<string, Book[]>()
+  for (const book of books) {
+    const list = byStudent.get(book.studentId) ?? []
+    list.push(book)
+    byStudent.set(book.studentId, list)
+  }
+  const studentIds = [...byStudent.keys()]
+  const radius = nebulaRingRadius(studentIds.length)
 
   const scene = new StarScene(wrap, {
     backgroundColor: 0x0a1230,
-    cameraPosition: [0, 10, 36],
+    cameraPosition: [0, 0, 1.95 * (radius + 4)], // 원 전체가 화면에 들어오는 거리
+    autoRotateSpeed: ROTATE_SPEED,
+    centerGlow: true,
     onStarClick: (book) => {
       openBookDetail(session.classCode, book, {
         canEdit: book.studentId === session.studentId,
@@ -41,42 +67,52 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     },
   })
 
-  try {
-    ;[books, students] = await Promise.all([
-      listClassBooks(session.classCode),
-      listStudents(session.classCode),
-    ])
-  } catch (err) {
-    hud.innerHTML = `<p class="error-text">학급 성운을 불러오지 못했어요: ${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`
-    return () => scene.dispose()
-  }
+  const entries: { book: Book; position: THREE.Vector3 }[] = []
+  const solidPairs: [THREE.Vector3, THREE.Vector3][] = []
+  const labels: { text: string; position: THREE.Vector3 }[] = []
 
-  const byStudent = new Map<string, typeof books>()
-  for (const book of books) {
-    const list = byStudent.get(book.studentId) ?? []
-    list.push(book)
-    byStudent.set(book.studentId, list)
-  }
-
-  const entries: { book: Book; position: import('three').Vector3 }[] = []
-  const positionByBookId = new Map<string, import('three').Vector3>()
-  const studentIds = [...byStudent.keys()]
   studentIds.forEach((studentId, idx) => {
     const studentBooks = byStudent.get(studentId)!
     const student = students.find((s) => s.id === studentId)
+    const template = student?.constellationTemplate ?? null
     const center = layoutClusterCenter(idx, studentIds.length)
     const customPositions = studentBooks.map((b) => student?.starPositions?.[b.id])
-    const localPositions = layoutStars(student?.constellationTemplate ?? null, studentBooks.length, customPositions)
+    const localPositions = layoutStars(template, studentBooks.length, customPositions)
+
+    // 별자리 모양의 중심을 원 위의 자리에 맞춰야 이웃 별자리와 겹치지 않는다
+    const cx = localPositions.reduce((s, p) => s + p.x, 0) / localPositions.length
+    const cy = localPositions.reduce((s, p) => s + p.y, 0) / localPositions.length
+
+    const worldById = new Map<string, THREE.Vector3>()
     studentBooks.forEach((book, i) => {
-      const p = localPositions[i].clone().multiplyScalar(0.6).add(center)
+      const p = localPositions[i].clone()
+      p.x -= cx
+      p.y -= cy
+      p.multiplyScalar(CLUSTER_SCALE).add(center)
       entries.push({ book, position: p })
-      positionByBookId.set(book.id, p)
+      worldById.set(book.id, p)
     })
+
+    // 학생이 직접 이은 선이 없으면 템플릿 모양대로 기본 선을 이어 별자리로 보이게 한다
+    const lines = student?.starLines
+      ?? defaultStarLines(template, studentBooks.map((b) => b.id), localPositions)
+    for (const { a, b } of lines) {
+      const pa = worldById.get(a)
+      const pb = worldById.get(b)
+      if (pa && pb) solidPairs.push([pa, pb])
+    }
+
+    const labelPos = center.clone()
+    labelPos.setLength(radius + 3.2)
+    labelPos.z = center.z
+    labels.push({ text: student?.nickname ?? '알 수 없음', position: labelPos })
   })
 
   scene.setStars(entries)
+  scene.setConnections(solidPairs)
+  scene.setLabels(labels)
 
-  // 같은 문장에 밑줄 친 학생끼리 연결선 (정규화한 문장 텍스트가 같은 경우)
+  // 같은 문장에 밑줄 친 서로 다른 학생끼리는 연한 점선으로 느슨하게 잇는다
   const normalize = (s: string) => s.replace(/\s+/g, '').replace(/["'“”‘’.,!?]/g, '')
   const byQuote = new Map<string, typeof entries>()
   for (const entry of entries) {
@@ -87,30 +123,21 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     list.push(entry)
     byQuote.set(key, list)
   }
-  const pairs: [import('three').Vector3, import('three').Vector3][] = []
+  const dashedPairs: [THREE.Vector3, THREE.Vector3][] = []
   for (const list of byQuote.values()) {
-    if (list.length < 2) continue
     for (let i = 1; i < list.length; i++) {
-      pairs.push([list[0].position, list[i].position])
+      if (list[i].book.studentId === list[0].book.studentId) continue
+      dashedPairs.push([list[0].position, list[i].position])
     }
   }
-  // 학생마다 편집기에서 직접 이은 별자리 선도 성운에 함께 그린다
-  for (const student of students) {
-    for (const { a, b } of student.starLines ?? []) {
-      const pa = positionByBookId.get(a)
-      const pb = positionByBookId.get(b)
-      if (pa && pb) pairs.push([pa, pb])
-    }
-  }
-  scene.setConnections(pairs)
+  scene.setDashedConnections(dashedPairs)
 
-  const ranking = [...students]
-    .sort((a, b) => b.starDust - a.starDust)
-    .slice(0, 5)
+  const ranking = [...students].sort((a, b) => b.starDust - a.starDust).slice(0, 5)
 
   hud.innerHTML = `
-    <div><strong>${state.classRoom?.name ?? '우리 학급'} 성운</strong></div>
-    <div>학생 ${students.length}명 · 별 ${books.length}개</div>
+    <div><strong>${escapeHtml(state.classRoom?.name ?? '우리 학급')} 성운</strong></div>
+    <div>학생 ${studentIds.length}명 · 별 ${books.length}개</div>
+    <div class="hint" style="margin-top:4px">별을 누르면 책과 읽은 친구를 볼 수 있어요<br/>노란 점선: 같은 문장에 밑줄 친 친구</div>
     <div style="margin-top:6px">주간 랭킹 Top 5</div>
     <ol style="margin:4px 0 0; padding-left:18px">
       ${ranking.map((s) => `<li>${escapeHtml(s.nickname)} — ${s.starDust}✨</li>`).join('') || '<li>아직 없음</li>'}
