@@ -3,7 +3,7 @@ import { listStudents } from '../lib/students'
 import { state } from '../state'
 import { navigate } from '../router'
 import { openBookDetail } from './BookDetailModal'
-import type { Book } from '../types'
+import type { Book, Student } from '../types'
 
 /** Firestore에서 읽어온 createdAt은 Timestamp 객체로 오고, 방금 로컬에서 만든 값은 number다. */
 function toMillis(value: unknown): number {
@@ -35,10 +35,17 @@ export async function renderBoard(container: HTMLElement): Promise<void> {
 
   const listEl = container.querySelector<HTMLElement>('#board-list')!
 
-  const [books, students] = await Promise.all([
-    listClassBooks(state.session.classCode),
-    listStudents(state.session.classCode),
-  ])
+  let books: Book[]
+  let students: Student[]
+  try {
+    ;[books, students] = await Promise.all([
+      listClassBooks(state.session.classCode),
+      listStudents(state.session.classCode),
+    ])
+  } catch (err) {
+    listEl.innerHTML = `<p class="error-text">게시판을 불러오지 못했어요: ${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`
+    return
+  }
   const nicknameOf = new Map(students.map((s) => [s.id, s.nickname]))
 
   const sorted = [...books].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
