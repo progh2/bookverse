@@ -1,4 +1,4 @@
-import { addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { createClass } from './classes'
 import { sha256Hex } from './crypto'
@@ -187,11 +187,20 @@ export async function seedDemoClass(teacherUid: string): Promise<string> {
   const demoPinHash = await sha256Hex('0000')
 
   for (const s of DEMO_STUDENTS) {
-    const studentRef = await addDoc(collection(db, 'classes', code, 'students'), {
-      classCode: code,
+    // 전역 계정(로그인용) + 학급 멤버십을 함께 만든다. 데모 닉네임은 매번 새 계정으로 만들어지므로
+    // "데모 학급 만들기"를 여러 번 누르면 같은 닉네임의 계정이 여러 개 생길 수 있다(해커톤 범위).
+    const accountRef = await addDoc(collection(db, 'students'), {
       nickname: s.nickname,
       pinHash: demoPinHash,
-      zodiac: s.zodiac,
+      classCodes: [code],
+      createdAt: serverTimestamp(),
+    })
+
+    const studentRef = doc(db, 'classes', code, 'students', accountRef.id)
+    await setDoc(studentRef, {
+      classCode: code,
+      nickname: s.nickname,
+      constellationTemplate: s.zodiac,
       starDust: 0,
       dailyEarned: 0,
       lastEarnDate: '',

@@ -61,6 +61,19 @@ export async function upsertBook(
   return { book: { ...newBook, id: ref.id }, isNew: true }
 }
 
+/** 학생 본인이 자기 책 내용을 직접 고친다(게시판/상세 화면의 '수정'). 별가루는 다시 지급하지 않는다. */
+export async function updateBook(
+  classCode: string,
+  studentId: string,
+  bookId: string,
+  patch: NewBookInput,
+) {
+  await updateDoc(
+    doc(db, 'classes', classCode, 'students', studentId, 'books', bookId),
+    omitUndefined(patch as unknown as Record<string, unknown>),
+  )
+}
+
 function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const result: Partial<T> = {}
   for (const [key, value] of Object.entries(obj)) {

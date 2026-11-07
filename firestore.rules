@@ -1,11 +1,21 @@
 rules_version = '2';
 
-// 해커톤 MVP 범위의 규칙입니다. 학생은 Firebase Auth 없이 "학급코드+닉네임+PIN"으로
-// 입장하므로(PRD 03탭), Firestore 규칙만으로는 "그 학생 본인"임을 완전히 검증할 수 없습니다.
+// 해커톤 MVP 범위의 규칙입니다. 학생은 Firebase Auth 없이 "전역 닉네임+PIN" 계정으로
+// 로그인하므로, Firestore 규칙만으로는 "그 학생 본인"임을 완전히 검증할 수 없습니다.
 // 1차 방어선(필수 필드·타입·길이 검증)만 두고, 실서비스 전환 시 Cloud Functions 기반
 // PIN 검증 또는 커스텀 토큰 발급으로 교체가 필요합니다 (README '보안 한계' 참고).
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // 전역 학생 계정(로그인/회원가입). 닉네임으로 조회해야 하므로 list를 열어둔다 —
+    // PIN 해시가 함께 노출되는 점은 해커톤 범위의 알려진 한계로 문서화한다.
+    match /students/{accountId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isValidAccount(request.resource.data);
+      allow update: if isValidAccount(request.resource.data);
+      allow delete: if false;
+    }
 
     match /classes/{classCode} {
       allow get: if true; // 학급 코드 존재 확인 (학생 입장 시 필요)
@@ -25,10 +35,11 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/classes/$(classCode)).data.teacherUid == request.auth.uid;
       }
 
+      // 학급 멤버십(학생의 전역 계정과 문서 ID가 같다). 별자리 템플릿·별가루 등은 학급별로 따로 쌓인다.
       match /students/{studentId} {
         allow read: if true;
-        allow create: if isValidStudent(request.resource.data);
-        allow update: if isValidStudent(request.resource.data);
+        allow create: if isValidMembership(request.resource.data);
+        allow update: if isValidMembership(request.resource.data);
         allow delete: if isSignedIn(); // 교사 정리용 (해커톤 범위: uid 소유권 교차검증 생략)
 
         match /books/{bookId} {
@@ -45,9 +56,15 @@ service cloud.firestore {
     return request.auth != null;
   }
 
-  function isValidStudent(data) {
+  function isValidAccount(data) {
     return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 12
       && data.pinHash is string && data.pinHash.size() == 64
+      && data.classCodes is list;
+  }
+
+  function isValidMembership(data) {
+    return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 12
+      && data.constellationTemplate is string
       && data.starDust is number && data.starDust >= 0;
   }
 

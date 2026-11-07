@@ -8,7 +8,7 @@ import { GENRE_COLORS } from '../types'
 
 export async function renderClassNebula(container: HTMLElement): Promise<() => void> {
   if (!state.session) {
-    navigate('/join')
+    navigate('/auth')
     return () => {}
   }
 
@@ -46,7 +46,8 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     const studentBooks = byStudent.get(studentId)!
     const student = students.find((s) => s.id === studentId)
     const center = layoutClusterCenter(idx, studentIds.length)
-    const localPositions = layoutStars(student?.zodiac ?? null, studentBooks.length)
+    const customPositions = studentBooks.map((b) => student?.starPositions?.[b.id])
+    const localPositions = layoutStars(student?.constellationTemplate ?? null, studentBooks.length, customPositions)
     studentBooks.forEach((book, i) => {
       const p = localPositions[i].clone().multiplyScalar(0.6).add(center)
       entries.push({ book, position: p })
@@ -86,7 +87,10 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     <ol style="margin:4px 0 0; padding-left:18px">
       ${ranking.map((s) => `<li>${escapeHtml(s.nickname)} — ${s.starDust}✨</li>`).join('') || '<li>아직 없음</li>'}
     </ol>
-    <div style="margin-top:6px"><a href="#/star" style="color:var(--line-blue)">내 별자리로 돌아가기 →</a></div>
+    <div style="margin-top:6px; display:flex; gap:10px">
+      <a href="#/star" style="color:var(--line-blue)">내 별자리로 →</a>
+      <a href="#/board" style="color:var(--line-blue)">게시판 →</a>
+    </div>
   `
 
   legend.innerHTML = Object.entries(GENRE_COLORS)

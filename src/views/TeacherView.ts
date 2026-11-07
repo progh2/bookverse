@@ -4,7 +4,8 @@ import {
 } from 'firebase/auth'
 import { auth, googleProvider, firebaseConfigured } from '../firebase'
 import { createClass, setClassVisibility, saveOpenAiKey, clearOpenAiKey } from '../lib/classes'
-import { listStudents, renameStudent, resetStudentPin, deleteStudent } from '../lib/students'
+import { listStudents, deleteStudent } from '../lib/students'
+import { getAccount, renameAccount, resetAccountPin } from '../lib/accounts'
 import { seedDemoClass } from '../lib/seed'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
@@ -143,7 +144,7 @@ async function loadClasses(panel: HTMLElement, uid: string) {
 
 function renderClassCard(c: ClassRoom, students: Student[]): string {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-    location.origin + location.pathname + '#/join?code=' + c.code,
+    location.origin + location.pathname + '#/auth',
   )}`
   return `
     <div class="book-row" style="flex-direction:column; align-items:flex-start; gap:10px" data-class="${c.code}">
@@ -152,6 +153,7 @@ function renderClassCard(c: ClassRoom, students: Student[]): string {
         <span class="badge">코드 ${c.code}</span>
       </div>
       <img src="${qrUrl}" width="100" height="100" alt="QR" />
+      <p class="hint">학생은 QR로 접속해 로그인/회원가입한 뒤, 학급 코드 <strong>${c.code}</strong>를 입력해 들어와요.</p>
 
       <label style="margin:0"><input type="checkbox" data-field="nebulaVisible" ${c.nebulaVisible ? 'checked' : ''} class="field-toggle" style="width:auto;display:inline-block;margin-right:6px" />학급 성운 공개</label>
       <label style="margin:0"><input type="checkbox" data-field="rankingVisible" ${c.rankingVisible ? 'checked' : ''} class="field-toggle" style="width:auto;display:inline-block;margin-right:6px" />주간 랭킹 공개</label>
@@ -227,10 +229,11 @@ function wireClassCard(listEl: HTMLElement, c: ClassRoom, students: Student[], r
     if (!row) return
 
     row.querySelector('.roster-rename')!.addEventListener('click', async () => {
-      const next = prompt('새 닉네임', s.nickname)
+      const next = prompt('새 닉네임 (이 학생의 다른 학급에도 함께 반영돼요)', s.nickname)
       if (!next || next.trim() === s.nickname) return
       try {
-        await renameStudent(c.code, s.id, next)
+        const account = await getAccount(s.id)
+        await renameAccount(s.id, next, account?.classCodes ?? [c.code])
         reload()
       } catch (err) {
         alert(err instanceof Error ? err.message : String(err))
@@ -238,8 +241,8 @@ function wireClassCard(listEl: HTMLElement, c: ClassRoom, students: Student[], r
     })
 
     row.querySelector('.roster-reset-pin')!.addEventListener('click', async () => {
-      if (!confirm(`${s.nickname} 학생의 비밀번호를 초기화할까요?`)) return
-      const newPin = await resetStudentPin(c.code, s.id)
+      if (!confirm(`${s.nickname} 학생의 비밀번호(계정 전체)를 초기화할까요?`)) return
+      const newPin = await resetAccountPin(s.id)
       alert(`새 비밀번호: ${newPin}\n학생에게 알려주세요.`)
     })
 

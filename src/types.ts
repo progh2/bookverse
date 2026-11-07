@@ -9,12 +9,27 @@ export interface ClassRoom {
   createdAt: number
 }
 
+/** 전역 학생 계정. 닉네임+PIN은 앱 전체에서 유일하며(학급마다 따로가 아님), 여러 학급에 동시에 속할 수 있다. */
+export interface StudentAccount {
+  id: string
+  nickname: string
+  pinHash: string
+  classCodes: string[]
+  createdAt: number
+}
+
+export interface StarPosition {
+  x: number
+  y: number
+}
+
+/** 한 학급 안에서의 학생 참여 정보(별자리·별가루 등은 학급별로 따로 쌓인다). 문서 ID는 StudentAccount.id와 같다. */
 export interface Student {
   id: string
   classCode: string
-  nickname: string
-  pinHash: string
-  zodiac: ZodiacSign | null
+  nickname: string // StudentAccount.nickname의 복사본(목록 표시용)
+  constellationTemplate: TemplateId
+  starPositions?: Record<string, StarPosition> // bookId -> 직접 배치한 좌표(편집기에서 저장)
   starDust: number
   dailyEarned: number
   lastEarnDate: string // YYYY-MM-DD (KST)
@@ -24,6 +39,10 @@ export interface Student {
 export type ZodiacSign =
   | 'aries' | 'taurus' | 'gemini' | 'cancer' | 'leo' | 'virgo'
   | 'libra' | 'scorpio' | 'sagittarius' | 'capricorn' | 'aquarius' | 'pisces'
+
+export type FamousConstellationId = 'big_dipper' | 'orion' | 'cassiopeia' | 'cygnus'
+
+export type TemplateId = ZodiacSign | FamousConstellationId
 
 export const GENRE_COLORS: Record<string, number> = {
   '소설': 0xff6b8a,
