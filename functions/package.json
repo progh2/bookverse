@@ -2,7 +2,7 @@
   "name": "bookverse-functions",
   "private": true,
   "type": "commonjs",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
