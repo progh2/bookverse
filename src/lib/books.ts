@@ -52,9 +52,19 @@ export async function upsertBook(
     classCode, // collectionGroup 쿼리용
     createdAt: Date.now(),
   }
-  const ref = await addDoc(booksCol(classCode, studentId), {
+  // Firestore는 undefined 필드 값을 거부한다 — 비워둔 선택 입력(quote, summary 등)은
+  // input에 undefined로 들어오므로 쓰기 전에 걷어내야 한다.
+  const ref = await addDoc(booksCol(classCode, studentId), omitUndefined({
     ...newBook,
     createdAt: serverTimestamp(),
-  })
+  }))
   return { book: { ...newBook, id: ref.id }, isNew: true }
+}
+
+function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const result: Partial<T> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) (result as Record<string, unknown>)[key] = value
+  }
+  return result
 }
