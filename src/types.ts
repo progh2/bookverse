@@ -23,6 +23,11 @@ export interface StarPosition {
   y: number
 }
 
+export interface StarLine {
+  a: string // bookId
+  b: string // bookId
+}
+
 /** 한 학급 안에서의 학생 참여 정보(별자리·별가루 등은 학급별로 따로 쌓인다). 문서 ID는 StudentAccount.id와 같다. */
 export interface Student {
   id: string
@@ -30,6 +35,7 @@ export interface Student {
   nickname: string // StudentAccount.nickname의 복사본(목록 표시용)
   constellationTemplate: TemplateId
   starPositions?: Record<string, StarPosition> // bookId -> 직접 배치한 좌표(편집기에서 저장)
+  starLines?: StarLine[] // 편집기에서 직접 이은 선(Firestore는 중첩 배열을 못 담아 객체 배열로 저장)
   starDust: number
   dailyEarned: number
   lastEarnDate: string // YYYY-MM-DD (KST)

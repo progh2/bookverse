@@ -1,8 +1,8 @@
-import type { Book, Student, StarPosition, TemplateId } from '../types'
+import type { Book, Student, StarLine, StarPosition, TemplateId } from '../types'
 import {
   TEMPLATE_OPTIONS, getTemplateBasePoints, getTemplateConnections, layoutStars,
 } from '../three/constellationLayout'
-import { saveStarPositions, setConstellationTemplate } from '../lib/students'
+import { saveStarLines, saveStarPositions, setConstellationTemplate } from '../lib/students'
 
 const CANVAS_PX = 480
 const UNIT_RANGE = 5 // 좌표 -5~5를 캔버스 0~CANVAS_PX로 매핑
@@ -31,7 +31,13 @@ export function openConstellationEditor(
   backdrop.innerHTML = `
     <div class="modal" style="width:min(560px, 100%)">
       <h2>🪄 별자리 편집</h2>
-      <p class="hint">별을 끌어서 원하는 자리에 놓아보세요. 연한 선은 템플릿 안내선이에요.</p>
+      <p class="hint" id="editor-hint">별을 끌어서 원하는 자리에 놓아보세요. 연한 파란 선은 템플릿 안내선이에요.</p>
+
+      <div style="display:flex; gap:8px; margin:10px 0">
+        <button type="button" class="btn secondary tab-btn active" id="mode-move" style="margin-top:0">✋ 별 옮기기</button>
+        <button type="button" class="btn secondary tab-btn" id="mode-link" style="margin-top:0">🔗 별 잇기</button>
+        <button type="button" class="btn secondary" id="clear-lines" style="margin-top:0; width:auto; display:none">선 모두 지우기</button>
+      </div>
 
       <label for="editor-template">별자리 템플릿</label>
       <select id="editor-template">
@@ -71,10 +77,17 @@ export function openConstellationEditor(
 
   let currentPositions = new Map<string, StarPosition>()
   const savedPositions = student.starPositions ?? {}
+  const bookIds = new Set(books.map((b) => b.id))
+  let currentLines: StarLine[] = (student.starLines ?? []).filter((l) => bookIds.has(l.a) && bookIds.has(l.b))
+  let mode: 'move' | 'link' = 'move'
+  let selectedId: string | null = null
 
   function rebuildPositions(templateId: TemplateId) {
     currentPositions = new Map()
-    const customArray = books.map((b) => savedPositions[b.id])
+    // 템플릿을 바꾸면 예전 템플릿 기준으로 옮겨둔 좌표는 버리고 새 템플릿 모양으로 다시 배치
+    const customArray = templateId === student.constellationTemplate
+      ? books.map((b) => savedPositions[b.id])
+      : []
     const defaults = layoutStars(templateId, books.length, customArray)
     books.forEach((book, i) => {
       const p = defaults[i]
@@ -105,6 +118,58 @@ export function openConstellationEditor(
       ctx.arc(x, y, 4, 0, Math.PI * 2)
       ctx.fill()
     }
+
+    // 학생이 직접 이은 선(안내선과 구분되게 노란색)
+    ctx.strokeStyle = 'rgba(255, 214, 107, 0.9)'
+    ctx.lineWidth = 2.5
+    for (const { a, b } of currentLines) {
+      const pa = currentPositions.get(a)
+      const pb = currentPositions.get(b)
+      if (!pa || !pb) continue
+      const [ax, ay] = unitToPx(pa.x, pa.y)
+      const [bx, by] = unitToPx(pb.x, pb.y)
+      ctx.beginPath()
+      ctx.moveTo(ax, ay)
+      ctx.lineTo(bx, by)
+      ctx.stroke()
+    }
+  }
+
+  function toggleLine(a: string, b: string) {
+    const idx = currentLines.findIndex((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a))
+    if (idx >= 0) currentLines.splice(idx, 1)
+    else currentLines.push({ a, b })
+  }
+
+  function handleLinkClick(bookId: string) {
+    if (selectedId === null) {
+      selectedId = bookId
+    } else if (selectedId === bookId) {
+      selectedId = null
+    } else {
+      toggleLine(selectedId, bookId)
+      selectedId = null
+    }
+    redraw()
+  }
+
+  function setMode(next: 'move' | 'link') {
+    mode = next
+    selectedId = null
+    backdrop.querySelector('#mode-move')!.classList.toggle('active', mode === 'move')
+    backdrop.querySelector('#mode-link')!.classList.toggle('active', mode === 'link')
+    backdrop.querySelector<HTMLElement>('#clear-lines')!.style.display = mode === 'link' ? '' : 'none'
+    backdrop.querySelector('#editor-hint')!.textContent = mode === 'move'
+      ? '별을 끌어서 원하는 자리에 놓아보세요. 연한 파란 선은 템플릿 안내선이에요.'
+      : '별 두 개를 차례로 누르면 선이 이어져요. 이미 이어진 두 별을 다시 누르면 선이 지워져요.'
+    redraw()
+  }
+
+  function redraw() {
+    drawGuide(templateSelect.value as TemplateId)
+    canvasWrap.querySelectorAll<HTMLElement>('.star-handle').forEach((el) => {
+      el.classList.toggle('selected', el.dataset.bookId === selectedId)
+    })
   }
 
   function renderHandles() {
@@ -114,6 +179,7 @@ export function openConstellationEditor(
       const [px, py] = unitToPx(pos.x, pos.y)
       const handle = document.createElement('div')
       handle.className = 'star-handle'
+      handle.dataset.bookId = book.id
       handle.title = book.title
       handle.textContent = book.title.slice(0, 1)
       handle.style.left = `${px}px`
@@ -126,6 +192,10 @@ export function openConstellationEditor(
   function wireDrag(handle: HTMLElement, bookId: string) {
     handle.addEventListener('pointerdown', (e) => {
       e.preventDefault()
+      if (mode === 'link') {
+        handleLinkClick(bookId)
+        return
+      }
       handle.setPointerCapture(e.pointerId)
       const move = (ev: PointerEvent) => {
         const rect = canvasWrap.getBoundingClientRect()
@@ -135,6 +205,7 @@ export function openConstellationEditor(
         handle.style.left = `${px}px`
         handle.style.top = `${py}px`
         currentPositions.set(bookId, pxToUnit(px, py))
+        if (currentLines.length > 0) drawGuide(templateSelect.value as TemplateId)
       }
       const up = () => {
         handle.removeEventListener('pointermove', move)
@@ -152,8 +223,16 @@ export function openConstellationEditor(
   templateSelect.addEventListener('change', () => {
     const templateId = templateSelect.value as TemplateId
     rebuildPositions(templateId)
-    drawGuide(templateId)
     renderHandles()
+    redraw()
+  })
+
+  backdrop.querySelector('#mode-move')!.addEventListener('click', () => setMode('move'))
+  backdrop.querySelector('#mode-link')!.addEventListener('click', () => setMode('link'))
+  backdrop.querySelector('#clear-lines')!.addEventListener('click', () => {
+    currentLines = []
+    selectedId = null
+    redraw()
   })
 
   backdrop.querySelector('#editor-save')!.addEventListener('click', async () => {
@@ -168,6 +247,7 @@ export function openConstellationEditor(
       const positions: Record<string, StarPosition> = {}
       currentPositions.forEach((v, k) => { positions[k] = v })
       await saveStarPositions(classCode, studentId, positions)
+      await saveStarLines(classCode, studentId, currentLines)
       close()
       onSaved()
     } catch (err) {

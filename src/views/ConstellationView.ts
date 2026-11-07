@@ -54,6 +54,12 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     const positions = layoutStars(state.student!.constellationTemplate, currentBooks.length, customPositions)
     scene.setStars(currentBooks.map((book, i) => ({ book, position: positions[i] })))
 
+    const positionByBookId = new Map(currentBooks.map((book, i) => [book.id, positions[i]]))
+    const connectionPairs = (state.student!.starLines ?? [])
+      .map(({ a, b }) => [positionByBookId.get(a), positionByBookId.get(b)] as const)
+      .filter((pair): pair is [import('three').Vector3, import('three').Vector3] => !!pair[0] && !!pair[1])
+    scene.setConnections(connectionPairs)
+
     hud.innerHTML = `
       <div><strong>${escapeHtml(state.student!.nickname)}</strong>님의 별자리 (${templateLabel(state.student!.constellationTemplate)})
         <button id="edit-nickname" class="hud-icon-btn" title="닉네임 수정">✏️</button>

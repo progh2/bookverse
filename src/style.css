@@ -428,6 +428,7 @@ textarea { min-height: 70px; resize: vertical; }
   touch-action: none;
 }
 .star-handle:active { cursor: grabbing; }
+.star-handle.selected { box-shadow: 0 0 0 3px var(--star-yellow); }
 
 .tab-btn { opacity: 0.55; }
 .tab-btn.active { opacity: 1; background: rgba(255, 255, 255, 0.1); }

@@ -4,7 +4,8 @@ import { listClassBooks } from '../lib/books'
 import { listStudents } from '../lib/students'
 import { state } from '../state'
 import { navigate } from '../router'
-import { GENRE_COLORS } from '../types'
+import { openBookDetail } from './BookDetailModal'
+import { GENRE_COLORS, type Book, type Student } from '../types'
 
 export async function renderClassNebula(container: HTMLElement): Promise<() => void> {
   if (!state.session) {
@@ -25,13 +26,30 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   const hud = container.querySelector<HTMLElement>('#hud')!
   const legend = container.querySelector<HTMLElement>('#legend')!
 
-  const scene = new StarScene(wrap, { backgroundColor: 0x0a1230 })
+  let books: Book[] = []
+  let students: Student[] = []
+  const session = state.session
+
+  const scene = new StarScene(wrap, {
+    backgroundColor: 0x0a1230,
+    onStarClick: (book) => {
+      openBookDetail(session.classCode, book, {
+        canEdit: book.studentId === session.studentId,
+        authorNickname: students.find((s) => s.id === book.studentId)?.nickname ?? '알 수 없음',
+      })
+    },
+  })
   scene.camera.position.set(0, 10, 36)
 
-  const [books, students] = await Promise.all([
-    listClassBooks(state.session.classCode),
-    listStudents(state.session.classCode),
-  ])
+  try {
+    ;[books, students] = await Promise.all([
+      listClassBooks(session.classCode),
+      listStudents(session.classCode),
+    ])
+  } catch (err) {
+    hud.innerHTML = `<p class="error-text">학급 성운을 불러오지 못했어요: ${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`
+    return () => scene.dispose()
+  }
 
   const byStudent = new Map<string, typeof books>()
   for (const book of books) {
@@ -40,7 +58,8 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     byStudent.set(book.studentId, list)
   }
 
-  const entries: { book: (typeof books)[number]; position: import('three').Vector3 }[] = []
+  const entries: { book: Book; position: import('three').Vector3 }[] = []
+  const positionByBookId = new Map<string, import('three').Vector3>()
   const studentIds = [...byStudent.keys()]
   studentIds.forEach((studentId, idx) => {
     const studentBooks = byStudent.get(studentId)!
@@ -51,6 +70,7 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     studentBooks.forEach((book, i) => {
       const p = localPositions[i].clone().multiplyScalar(0.6).add(center)
       entries.push({ book, position: p })
+      positionByBookId.set(book.id, p)
     })
   })
 
@@ -72,6 +92,14 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     if (list.length < 2) continue
     for (let i = 1; i < list.length; i++) {
       pairs.push([list[0].position, list[i].position])
+    }
+  }
+  // 학생마다 편집기에서 직접 이은 별자리 선도 성운에 함께 그린다
+  for (const student of students) {
+    for (const { a, b } of student.starLines ?? []) {
+      const pa = positionByBookId.get(a)
+      const pb = positionByBookId.get(b)
+      if (pa && pb) pairs.push([pa, pb])
     }
   }
   scene.setConnections(pairs)

@@ -2,7 +2,7 @@ import {
   arrayRemove, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { Student, StarPosition, TemplateId } from '../types'
+import type { Student, StarLine, StarPosition, TemplateId } from '../types'
 
 function studentsCol(classCode: string) {
   return collection(db, 'classes', classCode, 'students')
@@ -84,6 +84,15 @@ export async function saveStarPositions(
   positions: Record<string, StarPosition>,
 ) {
   await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { starPositions: positions })
+}
+
+/** 편집기에서 학생이 직접 이은 별-별 연결선을 저장한다. */
+export async function saveStarLines(
+  classCode: string,
+  studentId: string,
+  lines: StarLine[],
+) {
+  await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { starLines: lines })
 }
 
 /** 학생과 책 데이터를 모두 지운다(교사 전용 작업). 전역 계정 자체는 남고, 이 학급만 목록에서 빠진다. */
