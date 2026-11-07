@@ -53,10 +53,11 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   }
   const studentIds = [...byStudent.keys()]
   const radius = nebulaRingRadius(studentIds.length)
+  const cameraDistance = 2.2 * (radius + 4) // 원과 바깥 이름표까지 화면에 다 들어오는 거리
 
   const scene = new StarScene(wrap, {
     backgroundColor: 0x0a1230,
-    cameraPosition: [0, 0, 1.95 * (radius + 4)], // 원 전체가 화면에 들어오는 거리
+    cameraPosition: [0, 0, cameraDistance],
     autoRotateSpeed: ROTATE_SPEED,
     centerGlow: true,
     onStarClick: (book) => {
@@ -111,7 +112,7 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   scene.setStars(entries)
   scene.setConnections(solidPairs)
   // 원이 클수록 카메라가 멀어져 글씨가 작아지므로 그만큼 이름표를 키운다
-  scene.setLabels(labels, Math.max(1, (1.95 * (radius + 4)) / 24))
+  scene.setLabels(labels, Math.max(1, cameraDistance / 24))
 
   // 같은 문장에 밑줄 친 서로 다른 학생끼리는 연한 점선으로 느슨하게 잇는다
   const normalize = (s: string) => s.replace(/\s+/g, '').replace(/["'“”‘’.,!?]/g, '')
