@@ -111,6 +111,18 @@ input, textarea, select {
   color: var(--text);
 }
 
+/* 일부 브라우저는 select의 반투명 background를 드롭다운 팝업(option 목록)에는
+   적용하지 않고 시스템 기본(밝은) 배색으로 그려서, 다크 테마에서 글자가 안 보이는
+   문제가 생긴다. select/option에 불투명한 배색을 명시해 강제로 맞춘다. */
+select {
+  color-scheme: dark;
+  background-color: var(--bg-soft);
+}
+select option {
+  background-color: var(--bg-soft);
+  color: var(--text);
+}
+
 textarea { min-height: 70px; resize: vertical; }
 
 .btn {
