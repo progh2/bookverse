@@ -1,12 +1,13 @@
 {
-  "indexes": [
+  "indexes": [],
+  "fieldOverrides": [
     {
       "collectionGroup": "books",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "classCode", "order": "ASCENDING" }
+      "fieldPath": "classCode",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION_GROUP" }
       ]
     }
-  ],
-  "fieldOverrides": []
+  ]
 }

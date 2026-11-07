@@ -11,7 +11,7 @@ import { renderTeacher } from './views/TeacherView'
 const app = document.getElementById('app')!
 app.innerHTML = `
   <header class="topbar">
-    <a class="brand" href="#/">⭐ 북두칠성</a>
+    <a class="brand" href="#/">⭐ Book두칠성</a>
     <nav>
       <a href="#/star">내 별자리</a>
       <a href="#/class">학급 성운</a>

@@ -21,7 +21,7 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     <div class="view">
       <div class="star-canvas-wrap" id="star-wrap">
         <div class="hud" id="hud">불러오는 중...</div>
-        <button class="fab" id="add-book">+ 책 등록</button>
+        <button class="fab" id="add-book">+ 책으로 별 만들기</button>
       </div>
     </div>
   `

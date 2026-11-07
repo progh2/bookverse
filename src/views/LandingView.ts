@@ -79,7 +79,7 @@ export function renderLanding(container: HTMLElement) {
         <div class="bigdipper-wrap">
           <div class="bigdipper-section">
             ${buildConstellationSvg()}
-            <h1 class="bigdipper-title">⭐ 북두칠성</h1>
+            <h1 class="bigdipper-title">⭐ Book두칠성</h1>
             <p class="bigdipper-tagline">읽은 책이 별이 되어, 나만의 별자리가 됩니다</p>
           </div>
           <div class="landing-grid">

@@ -17,6 +17,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // collectionGroup('books') 쿼리(학급 성운·게시판이 학급 전체 책을 한 번에 읽을 때 씀)는
+    // 아래 classes/{code}/students/{id}/books/{id}의 중첩 match만으로는 허용되지 않는다 —
+    // Firestore는 특정 부모 경로로 들어오는 접근과 "어디서든" 들어오는 collectionGroup 쿼리를
+    // 다르게 취급하므로, 와일드카드 규칙을 별도로 둬야 collectionGroup 읽기가 통과한다.
+    match /{path=**}/books/{bookId} {
+      allow read: if true;
+    }
+
     match /classes/{classCode} {
       allow get: if true; // 학급 코드 존재 확인 (학생 입장 시 필요)
       // 교사 관리자 페이지가 "내 학급 목록"을 where(teacherUid==내 uid)로 조회할 수 있게 허용.
@@ -43,7 +51,7 @@ service cloud.firestore {
         allow delete: if isSignedIn(); // 교사 정리용 (해커톤 범위: uid 소유권 교차검증 생략)
 
         match /books/{bookId} {
-          allow read: if true;
+          // read는 위쪽 /{path=**}/books/{bookId} 규칙이 담당(collectionGroup 쿼리까지 포괄).
           allow create: if isValidBook(request.resource.data);
           allow update: if isValidBook(request.resource.data);
           allow delete: if true;

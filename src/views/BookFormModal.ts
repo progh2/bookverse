@@ -91,7 +91,7 @@ export function openBookForm(
   studentId: string,
   onSaved: (book: Book) => void,
 ) {
-  const backdrop = mountModal(formHtml('📖 책 등록하기', '별 만들기'))
+  const backdrop = mountModal(formHtml('📖 책으로 별 만들기', '별 만들기'))
   const form = backdrop.querySelector<HTMLFormElement>('#book-form')!
 
   form.addEventListener('submit', async (e) => {
