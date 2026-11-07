@@ -76,6 +76,7 @@ export class StarScene {
       sprite.scale.set(scale, scale, 1)
       sprite.position.copy(entry.position)
       sprite.userData.book = entry.book
+      sprite.userData.baseOpacity = material.opacity // 매 프레임 반짝임 계산의 기준값(고정)
       this.scene.add(sprite)
       this.sprites.push(sprite)
     }
@@ -119,7 +120,8 @@ export class StarScene {
     const t = this.clock.getElapsedTime()
     for (const sprite of this.sprites) {
       const twinkle = 0.9 + Math.sin(t * 2 + sprite.position.x) * 0.08
-      sprite.material.opacity = Math.min(1, (sprite.userData.baseOpacity ?? sprite.material.opacity) * twinkle)
+      const baseOpacity = (sprite.userData.baseOpacity as number) ?? sprite.material.opacity
+      sprite.material.opacity = Math.min(1, baseOpacity * twinkle)
     }
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
