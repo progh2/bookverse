@@ -67,7 +67,7 @@ export function characterSvg(id: string | undefined, size = 180): string {
       : `<circle cx="100" cy="100" r="38" fill="${c.face}"/>`
 
   return `
-  <svg viewBox="0 0 200 220" width="${size}" height="${Math.round(size * 1.1)}" class="character-svg" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="${size}" height="${Math.round(size * 1.1)}" class="character-svg" aria-hidden="true">
     <defs>
       <radialGradient id="${k}-glow"><stop offset="0" stop-color="${c.glow}" stop-opacity="0.55"/><stop offset="1" stop-color="${c.glow}" stop-opacity="0"/></radialGradient>
       <radialGradient id="${k}-helmet" cx="35%" cy="30%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/></radialGradient>
