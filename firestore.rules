@@ -55,6 +55,14 @@ service cloud.firestore {
           allow create: if isValidBook(request.resource.data);
           allow update: if isValidBook(request.resource.data);
           allow delete: if true;
+
+          // 게시판에서 친구들이 남기는 의견(자유 댓글). 수정은 막고 작성/삭제만 허용.
+          match /comments/{commentId} {
+            allow read: if true;
+            allow create: if isValidComment(request.resource.data);
+            allow update: if false;
+            allow delete: if true;
+          }
         }
       }
     }
@@ -74,6 +82,12 @@ service cloud.firestore {
     return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 12
       && data.constellationTemplate is string
       && data.starDust is number && data.starDust >= 0;
+  }
+
+  function isValidComment(data) {
+    return data.text is string && data.text.size() > 0 && data.text.size() <= 300
+      && data.authorId is string && data.authorId.size() > 0
+      && data.authorNickname is string && data.authorNickname.size() > 0 && data.authorNickname.size() <= 12;
   }
 
   function isValidBook(data) {

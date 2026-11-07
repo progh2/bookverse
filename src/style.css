@@ -505,3 +505,36 @@ textarea { min-height: 70px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   .cosmic-star, .cosmic-glow { animation: none !important; }
 }
+
+/* ===== 게시판 글 상세 + 의견 ===== */
+.post-modal { width: min(600px, 100%); }
+.post-section { margin-top: 14px; }
+.post-label { font-size: 12px; font-weight: 700; color: var(--star-yellow); margin-bottom: 2px; }
+.post-quote {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--star-yellow);
+  background: rgba(255, 214, 107, 0.07);
+  border-radius: 0 10px 10px 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.activity-chip {
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-dim);
+}
+.activity-chip.done {
+  border-color: rgba(255, 214, 107, 0.5);
+  color: var(--star-yellow);
+  background: rgba(255, 214, 107, 0.08);
+}
+.comment-row {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}

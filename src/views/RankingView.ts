@@ -16,7 +16,7 @@ export async function renderRanking(container: HTMLElement): Promise<void> {
     <div class="view">
       <div class="panel">
         <h1>🏆 학급 랭킹</h1>
-        <p class="hint">별이 많을수록 순위가 올라가요. 별자리를 풍성하게 채워보세요!</p>
+        <p class="hint">별가루를 많이 모을수록 순위가 올라가요(같으면 별이 많은 순). 책에 활동을 더 남겨보세요!</p>
         <div id="ranking-list" style="margin-top:16px"><p class="hint">불러오는 중...</p></div>
         <p class="hint" style="margin-top:20px">
           <a href="#/star">내 별자리로 →</a>
@@ -54,9 +54,9 @@ export async function renderRanking(container: HTMLElement): Promise<void> {
   }
 
   const ranked = [...students].sort((a, b) => {
-    const starDiff = (bookCountOf.get(b.id) ?? 0) - (bookCountOf.get(a.id) ?? 0)
-    if (starDiff !== 0) return starDiff
-    return b.starDust - a.starDust
+    const dustDiff = b.starDust - a.starDust
+    if (dustDiff !== 0) return dustDiff
+    return (bookCountOf.get(b.id) ?? 0) - (bookCountOf.get(a.id) ?? 0)
   })
 
   listEl.innerHTML = ranked
@@ -70,7 +70,7 @@ export async function renderRanking(container: HTMLElement): Promise<void> {
         <div>
           <strong>${medal ? `${medal} ` : ''}${rank}위 · ${escapeHtml(student.nickname)}</strong>
           ${isMe ? '<span class="badge">나</span>' : ''}
-          <div class="hint">⭐ 별 ${starCount}개 · ✨ 별가루 ${student.starDust}</div>
+          <div class="hint">✨ 별가루 ${student.starDust} · ⭐ 별 ${starCount}개</div>
         </div>
       </div>
     `

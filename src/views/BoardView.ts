@@ -2,20 +2,9 @@ import { listClassBooks } from '../lib/books'
 import { listStudents } from '../lib/students'
 import { state } from '../state'
 import { navigate } from '../router'
-import { openBookDetail } from './BookDetailModal'
+import { openBookPost } from './BookPostModal'
+import { toMillis } from '../lib/time'
 import type { Book, Student } from '../types'
-
-/** Firestore에서 읽어온 createdAt은 Timestamp 객체로 오고, 방금 로컬에서 만든 값은 number다. */
-function toMillis(value: unknown): number {
-  if (typeof value === 'number') return value
-  if (value && typeof value === 'object' && 'toMillis' in value) {
-    return (value as { toMillis: () => number }).toMillis()
-  }
-  if (value && typeof value === 'object' && 'seconds' in value) {
-    return (value as { seconds: number }).seconds * 1000
-  }
-  return 0
-}
 
 export async function renderBoard(container: HTMLElement): Promise<void> {
   if (!state.session) {
@@ -27,7 +16,7 @@ export async function renderBoard(container: HTMLElement): Promise<void> {
     <div class="view">
       <div class="panel">
         <h1>📋 게시판</h1>
-        <p class="hint">우리 학급 친구들이 등록한 책이 최신순으로 보여요. 내가 등록한 책은 눌러서 바로 고칠 수 있어요.</p>
+        <p class="hint">우리 학급 친구들이 등록한 책이 최신순으로 보여요. 눌러서 자세한 기록을 보고 의견을 남겨보세요.</p>
         <div id="board-list" style="margin-top:16px"><p class="hint">불러오는 중...</p></div>
       </div>
     </div>
@@ -73,9 +62,9 @@ export async function renderBoard(container: HTMLElement): Promise<void> {
   listEl.querySelectorAll<HTMLElement>('[data-index]').forEach((el) => {
     const book: Book = sorted[Number(el.dataset.index)]
     el.addEventListener('click', () => {
-      openBookDetail(state.session!.classCode, book, {
-        canEdit: book.studentId === state.session!.studentId,
-        authorNickname: nicknameOf.get(book.studentId),
+      openBookPost(book, {
+        authorNickname: nicknameOf.get(book.studentId) ?? '알 수 없음',
+        viewer: state.session!,
         onChanged: () => renderBoard(container),
       })
     })
