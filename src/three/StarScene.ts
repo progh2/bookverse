@@ -11,6 +11,7 @@ export interface StarEntry {
 export interface StarSceneOptions {
   backgroundColor?: number
   onStarClick?: (book: Book) => void
+  cameraPosition?: [number, number, number] // 정면 고정 뷰의 기준 위치(토글로 되돌아올 때도 이 위치)
 }
 
 /** 개인 별자리 뷰와 학급 성운 뷰가 공유하는 Three.js 렌더링 엔진. */
@@ -35,7 +36,7 @@ export class StarScene {
 
     const { clientWidth: w, clientHeight: h } = container
     this.camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 500)
-    this.camera.position.set(0, 2, 16)
+    this.camera.position.set(...(opts.cameraPosition ?? [0, 2, 16]))
     this.initialCameraPosition = this.camera.position.clone()
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
@@ -90,7 +91,7 @@ export class StarScene {
   setConnections(pairs: [THREE.Vector3, THREE.Vector3][]) {
     for (const line of this.lines) this.scene.remove(line)
     this.lines = []
-    const material = new THREE.LineBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.5 })
+    const material = new THREE.LineBasicMaterial({ color: 0x8fb4ff, transparent: true, opacity: 0.8 })
     for (const [a, b] of pairs) {
       const geometry = new THREE.BufferGeometry().setFromPoints([a, b])
       const line = new THREE.Line(geometry, material)

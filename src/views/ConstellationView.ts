@@ -39,6 +39,7 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
 
   const scene = new StarScene(wrap, {
     onStarClick: (book) => showBookDetail(book),
+    cameraPosition: [0, 0.3, 9], // 별자리 모양이 한눈에 들어오도록 가까이서 정면으로
   })
 
   let currentBooks: Book[] = []

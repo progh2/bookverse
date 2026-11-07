@@ -32,6 +32,7 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
 
   const scene = new StarScene(wrap, {
     backgroundColor: 0x0a1230,
+    cameraPosition: [0, 10, 36],
     onStarClick: (book) => {
       openBookDetail(session.classCode, book, {
         canEdit: book.studentId === session.studentId,
@@ -39,7 +40,6 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
       })
     },
   })
-  scene.camera.position.set(0, 10, 36)
 
   try {
     ;[books, students] = await Promise.all([
