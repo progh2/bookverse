@@ -1,4 +1,7 @@
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth'
+import {
+  onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
+  type User, type AuthError,
+} from 'firebase/auth'
 import { auth, googleProvider, firebaseConfigured } from '../firebase'
 import { createClass, setClassVisibility, saveOpenAiKey, clearOpenAiKey } from '../lib/classes'
 import { listStudents, renameStudent, resetStudentPin, deleteStudent } from '../lib/students'
@@ -19,18 +22,42 @@ export function renderTeacher(container: HTMLElement): () => void {
     return () => {}
   }
 
-  const unsub = onAuthStateChanged(auth, (user) => renderPanel(panel, user))
+  // 리다이렉트 방식 로그인으로 돌아온 경우 결과(또는 에러)를 먼저 확인한다.
+  let redirectError: string | null = null
+  getRedirectResult(auth).catch((err) => {
+    redirectError = describeAuthError(err)
+  })
+
+  const unsub = onAuthStateChanged(auth, (user) => renderPanel(panel, user, redirectError))
   return () => unsub()
 }
 
-async function renderPanel(panel: HTMLElement, user: User | null) {
+async function renderPanel(panel: HTMLElement, user: User | null, initialError: string | null = null) {
   if (!user) {
     panel.innerHTML = `
       <h1>🏫 교사 로그인</h1>
       <p class="hint">구글 계정으로 로그인하면 학급 코드를 만들고 관리할 수 있어요.</p>
       <button class="btn" id="google-login">구글로 로그인</button>
+      <p class="error-text" id="login-error">${initialError ? escapeHtml(initialError) : ''}</p>
     `
-    panel.querySelector('#google-login')!.addEventListener('click', () => signInWithPopup(auth, googleProvider))
+    const loginBtn = panel.querySelector<HTMLButtonElement>('#google-login')!
+    const errorEl = panel.querySelector<HTMLElement>('#login-error')!
+    loginBtn.addEventListener('click', async () => {
+      errorEl.textContent = ''
+      loginBtn.disabled = true
+      try {
+        await signInWithPopup(auth, googleProvider)
+      } catch (err) {
+        const code = (err as AuthError)?.code
+        // 팝업이 막히거나 자동화 브라우저로 인식돼 막히면 리다이렉트 방식으로 재시도
+        if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+          await signInWithRedirect(auth, googleProvider)
+          return
+        }
+        errorEl.textContent = describeAuthError(err)
+        loginBtn.disabled = false
+      }
+    })
     return
   }
 
@@ -216,6 +243,21 @@ function wireClassCard(listEl: HTMLElement, c: ClassRoom, students: Student[], r
       reload()
     })
   })
+}
+
+function describeAuthError(err: unknown): string {
+  const code = (err as AuthError)?.code
+  switch (code) {
+    case 'auth/unauthorized-domain':
+      return '이 사이트 주소가 Firebase 승인된 도메인 목록에 없어요. 콘솔 > Authentication > Settings > 승인된 도메인에 추가해 주세요.'
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return '로그인 창이 완료되기 전에 닫혔어요. 다시 시도해 주세요.'
+    case 'auth/network-request-failed':
+      return '네트워크 오류로 로그인에 실패했어요. 연결을 확인하고 다시 시도해 주세요.'
+    default:
+      return err instanceof Error ? `로그인 실패: ${err.message}` : '로그인에 실패했어요. 다시 시도해 주세요.'
+  }
 }
 
 function escapeHtml(s: string): string {
