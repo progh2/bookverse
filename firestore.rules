@@ -9,7 +9,9 @@ service cloud.firestore {
 
     match /classes/{classCode} {
       allow get: if true; // 학급 코드 존재 확인 (학생 입장 시 필요)
-      allow list: if false;
+      // 교사 관리자 페이지가 "내 학급 목록"을 where(teacherUid==내 uid)로 조회할 수 있게 허용.
+      // teacherUid 조건 없이 전체 목록을 긁어가는 질의는 이 조건을 만족하지 못해 거부된다.
+      allow list: if isSignedIn() && resource.data.teacherUid == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.teacherUid == request.auth.uid;
       allow update: if isSignedIn() && resource.data.teacherUid == request.auth.uid;
       allow delete: if false;

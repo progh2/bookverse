@@ -117,9 +117,15 @@ async function loadClasses(panel: HTMLElement, uid: string) {
   const listEl = panel.querySelector<HTMLElement>('#class-list')!
   listEl.innerHTML = '<p class="hint">학급 불러오는 중...</p>'
 
-  const q = query(collection(db, 'classes'), where('teacherUid', '==', uid))
-  const snap = await getDocs(q)
-  const classes = snap.docs.map((d) => d.data() as ClassRoom)
+  let classes: ClassRoom[]
+  try {
+    const q = query(collection(db, 'classes'), where('teacherUid', '==', uid))
+    const snap = await getDocs(q)
+    classes = snap.docs.map((d) => d.data() as ClassRoom)
+  } catch (err) {
+    listEl.innerHTML = `<p class="error-text">학급 목록을 불러오지 못했어요: ${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`
+    return
+  }
 
   if (classes.length === 0) {
     listEl.innerHTML = '<p class="hint">아직 만든 학급이 없어요.</p>'
