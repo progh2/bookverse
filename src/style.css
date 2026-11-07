@@ -301,3 +301,11 @@ textarea { min-height: 70px; resize: vertical; }
 
 .tab-btn { opacity: 0.55; }
 .tab-btn.active { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+
+.ranking-me {
+  background: rgba(255, 214, 107, 0.12);
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.ranking-me strong { color: var(--star-yellow); }
