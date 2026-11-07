@@ -1,5 +1,5 @@
 import { signUp, logIn } from '../lib/accounts'
-import { saveAccountSession } from '../lib/session'
+import { saveAccountSession, saveSession } from '../lib/session'
 import { state } from '../state'
 import { navigate } from '../router'
 
@@ -13,6 +13,13 @@ export function renderAuth(container: HTMLElement) {
         </div>
         <h1 id="auth-title">⭐ 로그인</h1>
         <p class="sub" id="auth-sub">닉네임과 비밀번호로 로그인해요. 여러 학급에 들어가 있어도 하나의 계정으로 모두 관리돼요.</p>
+
+        <div id="demo-hint" style="background:rgba(255,214,107,0.1); border:1px solid rgba(255,214,107,0.35); border-radius:10px; padding:12px 14px; margin-bottom:16px">
+          <p style="margin:0 0 8px; font-size:13px; color:var(--text-dim)">
+            예시 계정 — 닉네임 <strong style="color:var(--star-yellow)">데모학생</strong> · 비밀번호 <strong style="color:var(--star-yellow)">1234</strong>
+          </p>
+          <button type="button" class="btn secondary" id="demo-login-btn" style="width:auto; margin-top:0; padding:8px 14px; font-size:13px">✨ 바로 체험해보기</button>
+        </div>
 
         <form id="auth-form">
           <label for="nickname">닉네임</label>
@@ -56,6 +63,27 @@ export function renderAuth(container: HTMLElement) {
 
   tabLogin.addEventListener('click', () => setMode('login'))
   tabSignup.addEventListener('click', () => setMode('signup'))
+
+  container.querySelector('#demo-login-btn')!.addEventListener('click', async () => {
+    setMode('login')
+    errorEl.textContent = ''
+    const demoBtn = container.querySelector<HTMLButtonElement>('#demo-login-btn')!
+    demoBtn.disabled = true
+    demoBtn.textContent = '불러오는 중...'
+    try {
+      const account = await logIn('데모학생', '1234')
+      state.account = { accountId: account.id, nickname: account.nickname }
+      saveAccountSession(state.account)
+      // 데모 계정은 MB7B5X 학급 하나에만 들어가 있어서, 학급 선택 없이 바로 별자리로 이동
+      state.session = { classCode: 'MB7B5X', studentId: account.id, nickname: account.nickname }
+      saveSession(state.session)
+      navigate('/star')
+    } catch (err) {
+      errorEl.textContent = err instanceof Error ? err.message : String(err)
+      demoBtn.disabled = false
+      demoBtn.textContent = '✨ 바로 체험해보기'
+    }
+  })
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
