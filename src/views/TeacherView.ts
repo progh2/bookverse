@@ -1,9 +1,11 @@
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth'
 import { auth, googleProvider, firebaseConfigured } from '../firebase'
-import { createClass, setClassVisibility } from '../lib/classes'
+import { createClass, setClassVisibility, saveOpenAiKey, clearOpenAiKey } from '../lib/classes'
+import { listStudents, renameStudent, resetStudentPin, deleteStudent } from '../lib/students'
+import { seedDemoClass } from '../lib/seed'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { ClassRoom } from '../types'
+import type { ClassRoom, Student } from '../types'
 
 export function renderTeacher(container: HTMLElement): () => void {
   container.innerHTML = `<div class="view"><div class="panel" id="teacher-panel"><p>불러오는 중...</p></div></div>`
@@ -11,7 +13,7 @@ export function renderTeacher(container: HTMLElement): () => void {
 
   if (!firebaseConfigured) {
     panel.innerHTML = `
-      <h1>🏫 교사 화면</h1>
+      <h1>🏫 교사 관리자 화면</h1>
       <p class="hint">Firebase 설정이 아직 연결되지 않았어요. README의 안내대로 .env.local을 채운 뒤 다시 실행해 주세요.</p>
     `
     return () => {}
@@ -33,13 +35,17 @@ async function renderPanel(panel: HTMLElement, user: User | null) {
   }
 
   panel.innerHTML = `
-    <h1>🏫 ${user.displayName ?? '교사'}님의 학급</h1>
+    <h1>🏫 ${escapeHtml(user.displayName ?? '교사')}님의 관리자 페이지</h1>
     <button class="btn secondary" id="logout" style="width:auto">로그아웃</button>
 
     <div style="margin-top:24px">
       <label for="class-name">새 학급 이름</label>
       <input id="class-name" placeholder="예: 3학년 2반" />
-      <button class="btn" id="create-class">학급 코드 만들기</button>
+      <div style="display:flex; gap:10px; margin-top:12px">
+        <button class="btn" id="create-class" style="margin-top:0">학급 코드 만들기</button>
+        <button class="btn secondary" id="create-demo" style="margin-top:0">데모 학급 만들기</button>
+      </div>
+      <p class="hint">데모 학급은 중2 수준의 가상 학생 10명과 책 데이터를 바로 채워줘요(시연용).</p>
     </div>
 
     <div id="class-list" style="margin-top:24px"></div>
@@ -61,6 +67,22 @@ async function renderPanel(panel: HTMLElement, user: User | null) {
     }
   })
 
+  panel.querySelector('#create-demo')!.addEventListener('click', async () => {
+    const btn = panel.querySelector<HTMLButtonElement>('#create-demo')!
+    btn.disabled = true
+    btn.textContent = '데모 데이터 만드는 중...'
+    try {
+      const code = await seedDemoClass(user.uid)
+      await loadClasses(panel, user.uid)
+      alert(`데모 학급이 만들어졌어요! 학급 코드: ${code}`)
+    } catch (err) {
+      alert(`데모 학급 생성 실패: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      btn.disabled = false
+      btn.textContent = '데모 학급 만들기'
+    }
+  })
+
   await loadClasses(panel, user.uid)
 }
 
@@ -77,27 +99,121 @@ async function loadClasses(panel: HTMLElement, uid: string) {
     return
   }
 
+  const rosters = await Promise.all(classes.map((c) => listStudents(c.code)))
+
   listEl.innerHTML = classes
-    .map(
-      (c) => `
-      <div class="book-row" style="flex-direction:column; align-items:flex-start; gap:8px">
-        <div style="display:flex; justify-content:space-between; width:100%">
-          <strong>${escapeHtml(c.name)}</strong>
-          <span class="badge">코드 ${c.code}</span>
-        </div>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(location.origin + location.pathname + '#/join?code=' + c.code)}" width="100" height="100" alt="QR" />
-        <label style="margin:0"><input type="checkbox" data-code="${c.code}" data-field="nebulaVisible" ${c.nebulaVisible ? 'checked' : ''} style="width:auto;display:inline-block;margin-right:6px" />학급 성운 공개</label>
-        <label style="margin:0"><input type="checkbox" data-code="${c.code}" data-field="rankingVisible" ${c.rankingVisible ? 'checked' : ''} style="width:auto;display:inline-block;margin-right:6px" />주간 랭킹 공개</label>
-      </div>
-    `,
-    )
+    .map((c, i) => renderClassCard(c, rosters[i]))
     .join('')
 
-  listEl.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach((cb) => {
+  classes.forEach((c, i) => wireClassCard(listEl, c, rosters[i], () => loadClasses(panel, uid)))
+}
+
+function renderClassCard(c: ClassRoom, students: Student[]): string {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+    location.origin + location.pathname + '#/join?code=' + c.code,
+  )}`
+  return `
+    <div class="book-row" style="flex-direction:column; align-items:flex-start; gap:10px" data-class="${c.code}">
+      <div style="display:flex; justify-content:space-between; width:100%">
+        <strong>${escapeHtml(c.name)}</strong>
+        <span class="badge">코드 ${c.code}</span>
+      </div>
+      <img src="${qrUrl}" width="100" height="100" alt="QR" />
+
+      <label style="margin:0"><input type="checkbox" data-field="nebulaVisible" ${c.nebulaVisible ? 'checked' : ''} class="field-toggle" style="width:auto;display:inline-block;margin-right:6px" />학급 성운 공개</label>
+      <label style="margin:0"><input type="checkbox" data-field="rankingVisible" ${c.rankingVisible ? 'checked' : ''} class="field-toggle" style="width:auto;display:inline-block;margin-right:6px" />주간 랭킹 공개</label>
+
+      <details style="width:100%">
+        <summary style="cursor:pointer">🤖 AI 설정 (ChatGPT API 키) ${c.openaiKeyConfigured ? '<span class="badge">설정됨</span>' : ''}</summary>
+        <div style="margin-top:10px">
+          <p class="hint">키는 저장 후 다시 조회할 수 없어요(보안). 다시 설정하려면 새로 입력해 덮어쓰세요. 실제 호출은 서버(Cloud Functions)에서만 이뤄지고 학생 화면에는 절대 노출되지 않아요.</p>
+          <input type="password" class="ai-key-input" placeholder="sk-..." autocomplete="off" />
+          <div style="display:flex; gap:10px; margin-top:10px">
+            <button type="button" class="btn ai-key-save" style="margin-top:0">키 저장</button>
+            <button type="button" class="btn secondary ai-key-clear" style="margin-top:0">키 삭제</button>
+          </div>
+          <p class="error-text ai-key-msg"></p>
+        </div>
+      </details>
+
+      <details style="width:100%">
+        <summary style="cursor:pointer">👥 학생 명단 (${students.length}명)</summary>
+        <div style="margin-top:10px" class="roster">
+          ${students.length === 0 ? '<p class="hint">아직 입장한 학생이 없어요.</p>' : students.map((s) => `
+            <div class="book-row" data-student="${s.id}">
+              <div>
+                <strong class="roster-nickname">${escapeHtml(s.nickname)}</strong>
+                <span class="hint">별가루 ${s.starDust}✨</span>
+              </div>
+              <div style="display:flex; gap:6px">
+                <button type="button" class="btn secondary roster-rename" style="width:auto; margin-top:0; padding:6px 10px; font-size:13px">닉네임 수정</button>
+                <button type="button" class="btn secondary roster-reset-pin" style="width:auto; margin-top:0; padding:6px 10px; font-size:13px">PIN 초기화</button>
+                <button type="button" class="btn secondary roster-delete" style="width:auto; margin-top:0; padding:6px 10px; font-size:13px; color:#ff8a8a">삭제</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </details>
+    </div>
+  `
+}
+
+function wireClassCard(listEl: HTMLElement, c: ClassRoom, students: Student[], reload: () => void) {
+  const card = listEl.querySelector<HTMLElement>(`[data-class="${c.code}"]`)
+  if (!card) return
+
+  card.querySelectorAll<HTMLInputElement>('.field-toggle').forEach((cb) => {
     cb.addEventListener('change', () => {
-      const code = cb.dataset.code!
       const field = cb.dataset.field as 'nebulaVisible' | 'rankingVisible'
-      setClassVisibility(code, { [field]: cb.checked })
+      setClassVisibility(c.code, { [field]: cb.checked })
+    })
+  })
+
+  const keyInput = card.querySelector<HTMLInputElement>('.ai-key-input')!
+  const keyMsg = card.querySelector<HTMLElement>('.ai-key-msg')!
+  card.querySelector('.ai-key-save')!.addEventListener('click', async () => {
+    const key = keyInput.value.trim()
+    if (!key) { keyMsg.textContent = 'API 키를 입력해 주세요.'; return }
+    try {
+      await saveOpenAiKey(c.code, key)
+      keyInput.value = ''
+      keyMsg.style.color = ''
+      keyMsg.textContent = '저장됐어요. (Cloud Functions 배포가 완료돼야 실제 AI 호출에 쓰입니다)'
+    } catch (err) {
+      keyMsg.textContent = err instanceof Error ? err.message : String(err)
+    }
+  })
+  card.querySelector('.ai-key-clear')!.addEventListener('click', async () => {
+    await clearOpenAiKey(c.code)
+    keyMsg.textContent = '키를 삭제했어요.'
+    reload()
+  })
+
+  students.forEach((s) => {
+    const row = card.querySelector<HTMLElement>(`[data-student="${s.id}"]`)
+    if (!row) return
+
+    row.querySelector('.roster-rename')!.addEventListener('click', async () => {
+      const next = prompt('새 닉네임', s.nickname)
+      if (!next || next.trim() === s.nickname) return
+      try {
+        await renameStudent(c.code, s.id, next)
+        reload()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err))
+      }
+    })
+
+    row.querySelector('.roster-reset-pin')!.addEventListener('click', async () => {
+      if (!confirm(`${s.nickname} 학생의 비밀번호를 초기화할까요?`)) return
+      const newPin = await resetStudentPin(c.code, s.id)
+      alert(`새 비밀번호: ${newPin}\n학생에게 알려주세요.`)
+    })
+
+    row.querySelector('.roster-delete')!.addEventListener('click', async () => {
+      if (!confirm(`${s.nickname} 학생과 등록한 책을 모두 삭제할까요? 되돌릴 수 없어요.`)) return
+      await deleteStudent(c.code, s.id)
+      reload()
     })
   })
 }

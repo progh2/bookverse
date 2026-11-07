@@ -7,6 +7,10 @@ export async function sha256Hex(input: string): Promise<string> {
     .join('')
 }
 
+export function randomPin(): string {
+  return String(Math.floor(1000 + Math.random() * 9000))
+}
+
 export function randomClassCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 혼동되는 0/O, 1/I 제외
   let code = ''

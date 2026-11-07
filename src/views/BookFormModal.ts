@@ -2,7 +2,7 @@ import type { Book } from '../types'
 import { STAR_DUST_RULES } from '../types'
 import { upsertBook, type NewBookInput } from '../lib/books'
 import { earnStarDust } from '../lib/students'
-import { guessGenre } from '../lib/genre'
+import { requestGenreTags } from '../lib/ai'
 
 export function openBookForm(
   classCode: string,
@@ -93,7 +93,8 @@ export function openBookForm(
       const isBigStar = (backdrop.querySelector<HTMLInputElement>('#b-bigstar')!).checked
       const bigStarReason = val(backdrop, '#b-bigstar-reason')
 
-      const { genre, keywords } = guessGenre(title)
+      submitBtn.textContent = 'AI가 장르를 살펴보는 중...'
+      const { genre, keywords, source } = await requestGenreTags(classCode, title, author, quote)
 
       const input: NewBookInput = {
         title,
@@ -109,7 +110,7 @@ export function openBookForm(
         isBigStar: isBigStar || undefined,
         bigStarReason: bigStarReason || undefined,
         genre,
-        genreIsAiGuess: true,
+        genreIsAiGuess: true, // AI 실연동이든 폴백이든 '추정'이므로 학생이 고칠 수 있게 표시
         keywords,
       }
 
@@ -129,6 +130,7 @@ export function openBookForm(
     } catch (err) {
       errorEl.textContent = err instanceof Error ? err.message : String(err)
       submitBtn.disabled = false
+      submitBtn.textContent = '별 만들기'
     }
   })
 }

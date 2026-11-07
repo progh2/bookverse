@@ -1,0 +1,42 @@
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '../firebase'
+import { guessGenre } from './genre'
+
+export interface GenreTagResult {
+  genre: string
+  keywords: string[]
+  source: 'ai' | 'fallback'
+}
+
+interface GenerateBookTagsResponse {
+  genre: string
+  keywords: string[]
+}
+
+/**
+ * 책 제목·저자로 장르 1개·키워드 3개를 추정한다.
+ * 교사가 관리자 페이지에서 OpenAI 키를 저장해뒀으면 Cloud Function(generateBookTags)이
+ * 서버에서 실제 AI 호출을 대신 해준다(클라이언트는 키를 절대 보지 않음).
+ * 키가 없거나 호출이 실패하면 로컬 휴리스틱(guessGenre)으로 조용히 대체한다.
+ */
+export async function requestGenreTags(
+  classCode: string,
+  title: string,
+  author: string,
+  quote?: string,
+): Promise<GenreTagResult> {
+  try {
+    const call = httpsCallable<
+      { classCode: string; title: string; author: string; quote?: string },
+      GenerateBookTagsResponse
+    >(functions, 'generateBookTags')
+    const res = await call({ classCode, title, author, quote })
+    if (res.data?.genre) {
+      return { genre: res.data.genre, keywords: res.data.keywords ?? [], source: 'ai' }
+    }
+  } catch {
+    // 키 미설정, 일일 호출 상한 도달, 네트워크 오류 등 — 조용히 폴백
+  }
+  const fallback = guessGenre(title)
+  return { ...fallback, source: 'fallback' }
+}

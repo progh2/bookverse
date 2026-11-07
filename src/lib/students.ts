@@ -1,9 +1,9 @@
 import {
-  addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { Student, ZodiacSign } from '../types'
-import { sha256Hex } from './crypto'
+import { sha256Hex, randomPin } from './crypto'
 
 function studentsCol(classCode: string) {
   return collection(db, 'classes', classCode, 'students')
@@ -76,4 +76,30 @@ export async function earnStarDust(classCode: string, studentId: string, amount:
     lastEarnDate: today,
   })
   return granted
+}
+
+/** 닉네임을 바꾼다. 같은 학급 안에 이미 쓰는 닉네임이면 거부한다. */
+export async function renameStudent(classCode: string, studentId: string, newNickname: string) {
+  const name = newNickname.trim()
+  if (!name) throw new Error('닉네임을 입력해 주세요.')
+  const q = query(studentsCol(classCode), where('nickname', '==', name))
+  const snap = await getDocs(q)
+  const taken = snap.docs.some((d) => d.id !== studentId)
+  if (taken) throw new Error('이미 같은 학급에서 쓰고 있는 닉네임이에요.')
+  await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { nickname: name })
+}
+
+/** 교사가 학생 비밀번호를 초기화한다. 새 PIN을 생성해 반환하니 학생에게 알려줘야 한다. */
+export async function resetStudentPin(classCode: string, studentId: string): Promise<string> {
+  const pin = randomPin()
+  const pinHash = await sha256Hex(pin)
+  await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { pinHash })
+  return pin
+}
+
+/** 학생과 책 데이터를 모두 지운다(교사 전용 작업). */
+export async function deleteStudent(classCode: string, studentId: string) {
+  const booksSnap = await getDocs(collection(db, 'classes', classCode, 'students', studentId, 'books'))
+  await Promise.all(booksSnap.docs.map((d) => deleteDoc(d.ref)))
+  await deleteDoc(doc(db, 'classes', classCode, 'students', studentId))
 }

@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDoc, serverTimestamp, setDoc, updateDoc,
+  collection, deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { ClassRoom } from '../types'
@@ -40,4 +40,35 @@ export async function setClassVisibility(
 
 export function classesCollection() {
   return collection(db, 'classes')
+}
+
+/**
+ * OpenAI API 키를 저장한다. 실제 키는 "쓰기 전용" 비밀 문서(classes/{code}/secrets/openai)에
+ * 들어가고 Firestore 규칙상 클라이언트는 이 문서를 절대 읽을 수 없다(Cloud Function만 Admin
+ * SDK로 읽음). 저장 여부 표시용 플래그만 classes/{code} 문서에 따로 남긴다.
+ */
+export async function saveOpenAiKey(classCode: string, apiKey: string) {
+  await setDoc(doc(db, 'classes', classCode, 'secrets', 'openai'), {
+    apiKey,
+    updatedAt: serverTimestamp(),
+    dailyCallCount: 0,
+    lastCallDate: '',
+  })
+  await updateDoc(doc(db, 'classes', classCode), {
+    openaiKeyConfigured: true,
+    openaiKeyUpdatedAt: Date.now(),
+  })
+}
+
+export async function clearOpenAiKey(classCode: string) {
+  await setDoc(doc(db, 'classes', classCode, 'secrets', 'openai'), {
+    apiKey: '',
+    updatedAt: serverTimestamp(),
+    dailyCallCount: 0,
+    lastCallDate: '',
+  })
+  await updateDoc(doc(db, 'classes', classCode), {
+    openaiKeyConfigured: false,
+    openaiKeyUpdatedAt: deleteField(),
+  })
 }

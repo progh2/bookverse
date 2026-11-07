@@ -1,4 +1,4 @@
-# ⭐ 밑줄 별자리 (BookVerse)
+# ⭐ 북두칠성
 
 읽은 책을 별로 모아 3D 별자리로 키우는 독서 기록 서비스. JUST BUILD 2026 팀 M3WE PRD 기반. 상세 기획은 [PRD.md](./PRD.md) 참고.
 
@@ -22,6 +22,24 @@ npm run dev
    `VITE_FIREBASE_API_KEY` 등의 이름으로 등록해야 배포 빌드에도 반영됩니다.
 
 Firebase 설정 전에도 앱은 실행되지만(placeholder config), 로그인·저장 기능은 동작하지 않습니다.
+
+## AI 기능(장르·키워드 자동 추정) 연결하기
+
+교사 관리자 페이지(`#/teacher`)에서 학급별로 ChatGPT(OpenAI) API 키를 저장할 수 있습니다. 키는
+Firestore의 "쓰기 전용" 문서(`classes/{code}/secrets/openai`)에 들어가고 클라이언트는 절대 다시
+읽을 수 없습니다 — 실제 OpenAI 호출은 Cloud Function(`functions/`)이 서버 쪽에서만 수행합니다.
+
+**Cloud Functions를 배포해야 실제로 동작합니다** (배포 전에는 자동으로 로컬 휴리스틱 추정으로 대체됩니다):
+
+```bash
+npm install -g firebase-tools   # 최초 1회
+firebase login                  # 브라우저로 구글 로그인
+firebase deploy --only firestore:rules,firestore:indexes,functions
+```
+
+- Cloud Functions가 OpenAI(외부 API)를 호출하려면 Firebase **Blaze(종량제) 요금제**가 필요합니다(Spark 무료 플랜은 외부 네트워크 호출 불가).
+- 올라마(Ollama)는 로컬/사설 서버라 정적 사이트+서버리스 구조에서 안전하게 호출하기 어려워 이번 범위에서는 제외했습니다.
+- 학급당 하루 AI 호출 상한(기본 200회)을 Cloud Function 안에서 강제해 비용 폭주를 막습니다.
 
 ## 배포
 

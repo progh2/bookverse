@@ -4,6 +4,8 @@ export interface ClassRoom {
   teacherUid: string
   nebulaVisible: boolean
   rankingVisible: boolean
+  openaiKeyConfigured?: boolean
+  openaiKeyUpdatedAt?: number
   createdAt: number
 }
 
