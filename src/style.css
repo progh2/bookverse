@@ -252,6 +252,17 @@ textarea { min-height: 70px; resize: vertical; }
   transform-origin: center;
 }
 
+.bigdipper-book {
+  animation: bigdipper-float 4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes bigdipper-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
 .bigdipper-title {
   margin: 10px 0 2px;
   font-size: 20px;
@@ -287,9 +298,13 @@ textarea { min-height: 70px; resize: vertical; }
   .bigdipper-line,
   .bigdipper-star,
   .bigdipper-halo,
+  .bigdipper-book,
   .bigdipper-bg i {
     animation: none !important;
     stroke-dashoffset: 0;
+  }
+  .bigdipper-dust {
+    display: none;
   }
 }
 

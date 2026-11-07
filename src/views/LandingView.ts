@@ -30,6 +30,48 @@ const DIPPER_ORDER: StarKey[] = ['alkaid', 'mizar', 'alioth', 'megrez', 'phecda'
 // 4개의 꼭짓점을 가진 별 모양 path (단위 좌표, scale/translate로 배치)
 const STAR_PATH = 'M0,-1 L.26,-.26 L1,0 L.26,.26 L0,1 L-.26,.26 L-1,0 L-.26,-.26Z'
 
+// 책(빛의 근원) 위치와, 거기서 천권(책이 된 별) 자리로 빛가루가 솟아오르는 경로.
+const BOOK_POS: [number, number] = [196, 214]
+const DUST_PATH_D = (() => {
+  const [bx, by] = BOOK_POS
+  const [mx, my] = starPoint('megrez')
+  const cx = (bx + mx) / 2 + 18
+  const cy = (by + my) / 2
+  return `M${bx},${by} Q${cx},${cy} ${mx},${my}`
+})()
+
+function buildBookSvg(): string {
+  const [x, y] = BOOK_POS
+  // 펼쳐진 책을 단순화한 두 쪽 모양(좌/우 페이지) path. 책등은 가운데 세로선.
+  const leftPage = 'M-22,-7 C-15,-11 -7,-11 0,-8 L0,10 C-7,7 -15,7 -22,11 Z'
+  const rightPage = 'M22,-7 C15,-11 7,-11 0,-8 L0,10 C7,7 15,7 22,11 Z'
+
+  const dust = Array.from({ length: 7 })
+    .map((_, i) => {
+      const dur = (2.6 + (i % 3) * 0.5).toFixed(2)
+      const begin = (i * 0.45).toFixed(2)
+      return `
+        <circle r="${1.4 + (i % 3) * 0.5}" fill="var(--star-yellow)" opacity="0">
+          <animateMotion dur="${dur}s" begin="${begin}s" repeatCount="indefinite" path="${DUST_PATH_D}" rotate="auto" />
+          <animate attributeName="opacity" values="0;0.9;0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" />
+        </circle>
+      `
+    })
+    .join('')
+
+  return `
+    <circle class="bigdipper-halo" cx="${x}" cy="${y}" r="20" fill="var(--star-yellow)"></circle>
+    <g transform="translate(${x} ${y})">
+      <g class="bigdipper-book">
+        <path d="${leftPage}" fill="var(--bg-soft)" stroke="var(--star-yellow)" stroke-width="1.4"></path>
+        <path d="${rightPage}" fill="var(--bg-soft)" stroke="var(--star-yellow)" stroke-width="1.4"></path>
+        <line x1="0" y1="-8" x2="0" y2="10" stroke="var(--star-yellow)" stroke-width="1.2"></line>
+      </g>
+    </g>
+    <g class="bigdipper-dust">${dust}</g>
+  `
+}
+
 function buildConstellationSvg(): string {
   const linePoints = DIPPER_ORDER.map((key) => starPoint(key).join(',')).join(' ')
 
@@ -48,7 +90,9 @@ function buildConstellationSvg(): string {
     .join('')
 
   return `
-    <svg class="bigdipper-svg" viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg class="bigdipper-svg" viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet" aria-hidden="true"
+         role="img" aria-label="밤하늘에 펼쳐진 책에서 빛이 올라가 북두칠성으로 이어진다">
+      ${buildBookSvg()}
       <polyline class="bigdipper-line" points="${linePoints}" pathLength="1"></polyline>
       ${starsSvg}
     </svg>
