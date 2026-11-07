@@ -1,8 +1,9 @@
 import { addDoc, collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { normalizeQuote } from './entries'
 import { db } from '../firebase'
 import { createClass } from './classes'
 import { sha256Hex } from './crypto'
-import type { ZodiacSign } from '../types'
+import type { EntryType, ZodiacSign } from '../types'
 
 interface SeedBook {
   title: string
@@ -208,7 +209,19 @@ export async function seedDemoClass(teacherUid: string): Promise<string> {
     })
 
     for (const b of s.books) {
-      await addDoc(collection(db, 'classes', code, 'students', studentRef.id, 'books'), {
+      // 예전 단일 필드 형태의 데모 내용을 기록(entries)으로 바꿔 넣는다(작성자는 책 주인)
+      const seedEntries: { type: EntryType; text: string; page?: string }[] = [
+        ...(b.quote ? [{ type: 'quote' as const, text: b.quote, page: b.quotePage }] : []),
+        ...(b.reason ? [{ type: 'reason' as const, text: b.reason }] : []),
+        ...(b.rereadCount ? [{ type: 'reread' as const, text: '' }] : []),
+        ...(b.summary ? [{ type: 'summary' as const, text: b.summary }] : []),
+        ...(b.feeling ? [{ type: 'feeling' as const, text: b.feeling }] : []),
+        ...(b.inquiryQuestion ? [{ type: 'inquiry' as const, text: b.inquiryQuestion }] : []),
+      ]
+      const entryCounts: Partial<Record<EntryType, number>> = {}
+      for (const e of seedEntries) entryCounts[e.type] = (entryCounts[e.type] ?? 0) + 1
+
+      const bookRef = await addDoc(collection(db, 'classes', code, 'students', studentRef.id, 'books'), {
         classCode: code,
         studentId: studentRef.id,
         title: b.title,
@@ -217,17 +230,23 @@ export async function seedDemoClass(teacherUid: string): Promise<string> {
         genre: b.genre,
         genreIsAiGuess: true,
         keywords: b.keywords,
-        quote: b.quote ?? null,
-        quotePage: b.quotePage ?? null,
-        reason: b.reason ?? null,
-        rereadCount: b.rereadCount ?? null,
-        summary: b.summary ?? null,
-        feeling: b.feeling ?? null,
-        inquiryQuestion: b.inquiryQuestion ?? null,
         isBigStar: b.isBigStar ?? false,
-        bigStarReason: b.bigStarReason ?? null,
+        ...(b.bigStarReason ? { bigStarReason: b.bigStarReason } : {}),
+        entryCounts,
+        quoteKeys: seedEntries.filter((e) => e.type === 'quote').map((e) => normalizeQuote(e.text)),
+        earnedTypes: [...new Set(seedEntries.map((e) => e.type).filter((t) => t !== 'quote'))],
         createdAt: serverTimestamp(),
       })
+      for (const e of seedEntries) {
+        await addDoc(collection(bookRef, 'entries'), {
+          type: e.type,
+          text: e.text,
+          ...(e.page ? { page: e.page } : {}),
+          authorId: studentRef.id,
+          authorNickname: s.nickname,
+          createdAt: serverTimestamp(),
+        })
+      }
     }
 
     // 시연용으로 보이도록 누적 별가루를 한 번에 세팅(일일 상한 로직은 우회)

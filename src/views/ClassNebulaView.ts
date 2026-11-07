@@ -7,7 +7,7 @@ import { listClassBooks } from '../lib/books'
 import { listStudents } from '../lib/students'
 import { state } from '../state'
 import { navigate } from '../router'
-import { openBookDetail } from './BookDetailModal'
+import { openBookPost } from './BookPostModal'
 import { GENRE_COLORS, type Book, type Student } from '../types'
 
 const CLUSTER_SCALE = 0.7 // 학생 한 명의 별자리를 원 위에 올릴 때의 축소 비율
@@ -61,9 +61,10 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     autoRotateSpeed: ROTATE_SPEED,
     centerGlow: true,
     onStarClick: (book) => {
-      openBookDetail(session.classCode, book, {
-        canEdit: book.studentId === session.studentId,
+      // 친구 별이어도 같은 상세 화면에서 기록을 더하거나(내 기록은) 고칠 수 있다
+      openBookPost(book, {
         authorNickname: students.find((s) => s.id === book.studentId)?.nickname ?? '알 수 없음',
+        viewer: session,
       })
     },
   })
@@ -115,15 +116,15 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   scene.setLabels(labels, Math.max(1, cameraDistance / 24))
 
   // 같은 문장에 밑줄 친 서로 다른 학생끼리는 연한 점선으로 느슨하게 잇는다
-  const normalize = (s: string) => s.replace(/\s+/g, '').replace(/["'“”‘’.,!?]/g, '')
+  // (책마다 남긴 문장들의 정규화 키 quoteKeys를 책 문서에 함께 저장해 두므로 기록을 따로 읽지 않아도 된다)
   const byQuote = new Map<string, typeof entries>()
   for (const entry of entries) {
-    if (!entry.book.quote) continue
-    const key = normalize(entry.book.quote)
-    if (!key) continue
-    const list = byQuote.get(key) ?? []
-    list.push(entry)
-    byQuote.set(key, list)
+    for (const key of new Set(entry.book.quoteKeys ?? [])) {
+      if (!key) continue
+      const list = byQuote.get(key) ?? []
+      list.push(entry)
+      byQuote.set(key, list)
+    }
   }
   const dashedPairs: [THREE.Vector3, THREE.Vector3][] = []
   for (const list of byQuote.values()) {

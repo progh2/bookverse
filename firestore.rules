@@ -56,11 +56,21 @@ service cloud.firestore {
           allow update: if isValidBook(request.resource.data);
           allow delete: if true;
 
-          // 게시판에서 친구들이 남기는 의견(자유 댓글). 수정은 막고 작성/삭제만 허용.
+          // 책 하나에 여러 개씩 다는 기록(문장·느낀점·요약·계기·탐구질문·다시읽음·의견).
+          // 책 주인과 친구 모두 작성 가능. 고칠 때 작성자·종류는 못 바꾼다.
+          match /entries/{entryId} {
+            allow read: if true;
+            allow create: if isValidEntry(request.resource.data);
+            allow update: if isValidEntry(request.resource.data)
+              && request.resource.data.authorId == resource.data.authorId
+              && request.resource.data.type == resource.data.type;
+            allow delete: if true;
+          }
+
+          // (구) 게시판 의견. entries의 'opinion'으로 옮긴 뒤로는 읽기만 남겨둔다.
           match /comments/{commentId} {
             allow read: if true;
-            allow create: if isValidComment(request.resource.data);
-            allow update: if false;
+            allow create, update: if false;
             allow delete: if true;
           }
         }
@@ -84,10 +94,12 @@ service cloud.firestore {
       && data.starDust is number && data.starDust >= 0;
   }
 
-  function isValidComment(data) {
-    return data.text is string && data.text.size() > 0 && data.text.size() <= 300
+  function isValidEntry(data) {
+    return data.type in ['quote', 'reason', 'reread', 'summary', 'feeling', 'inquiry', 'opinion']
+      && data.text is string && data.text.size() <= 500
       && data.authorId is string && data.authorId.size() > 0
-      && data.authorNickname is string && data.authorNickname.size() > 0 && data.authorNickname.size() <= 12;
+      && data.authorNickname is string && data.authorNickname.size() > 0 && data.authorNickname.size() <= 12
+      && (!('page' in data) || (data.page is string && data.page.size() <= 20));
   }
 
   function isValidBook(data) {

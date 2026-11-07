@@ -6,7 +6,7 @@ import { getAccount, renameAccount } from '../lib/accounts'
 import { state } from '../state'
 import { navigate } from '../router'
 import { openBookForm } from './BookFormModal'
-import { openBookDetail } from './BookDetailModal'
+import { openBookPost } from './BookPostModal'
 import { openConstellationEditor } from './ConstellationEditor'
 import type { Book } from '../types'
 import { saveSession } from '../lib/session'
@@ -132,20 +132,24 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     })
   }
 
+  async function reloadStudentAndStars() {
+    state.student = await getStudent(state.session!.classCode, state.session!.studentId)
+    await refresh()
+  }
+
   function showBookDetail(book: Book) {
-    openBookDetail(state.session!.classCode, book, {
-      canEdit: true,
-      onChanged: async () => {
-        state.student = await getStudent(state.session!.classCode, state.session!.studentId)
-        await refresh()
-      },
+    openBookPost(book, {
+      authorNickname: state.student!.nickname,
+      viewer: state.session!,
+      onChanged: reloadStudentAndStars,
     })
   }
 
   container.querySelector('#add-book')!.addEventListener('click', () => {
-    openBookForm(state.session!.classCode, state.session!.studentId, async () => {
-      state.student = await getStudent(state.session!.classCode, state.session!.studentId)
-      await refresh()
+    openBookForm(state.session!.classCode, state.session!.studentId, async (book) => {
+      await reloadStudentAndStars()
+      // 별을 만든 직후 바로 문장·느낀점 같은 기록을 더할 수 있게 상세 화면을 연다
+      showBookDetail(book)
     })
   })
 

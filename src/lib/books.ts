@@ -1,11 +1,17 @@
 import {
-  addDoc, collection, collectionGroup, doc, getDocs, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, collectionGroup, deleteField, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { Book } from '../types'
 
 function booksCol(classCode: string, studentId: string) {
   return collection(db, 'classes', classCode, 'students', studentId, 'books')
+}
+
+/** 기록을 더하거나 고친 뒤 개수·문장 키 등이 반영된 최신 책 문서를 다시 읽는다. */
+export async function getBook(book: Pick<Book, 'classCode' | 'studentId' | 'id'>): Promise<Book | null> {
+  const snap = await getDoc(doc(db, 'classes', book.classCode, 'students', book.studentId, 'books', book.id))
+  return snap.exists() ? { ...(snap.data() as Omit<Book, 'id'>), id: snap.id } : null
 }
 
 export async function listBooks(classCode: string, studentId: string): Promise<Book[]> {
@@ -22,7 +28,10 @@ export async function listClassBooks(classCode: string): Promise<Book[]> {
 
 export type NewBookInput = Omit<Book, 'id' | 'studentId' | 'createdAt' | 'classCode'>
 
-/** 같은 제목+저자가 이미 있으면 활동을 덧붙이고, 없으면 새 별을 만든다. */
+/**
+ * 같은 제목+저자가 이미 있으면 새 별을 만들지 않고 기존 별을 돌려준다(isNew=false).
+ * 문장·느낀점 같은 기록은 등록 이후 상세 화면에서 entries로 따로 더한다.
+ */
 export async function upsertBook(
   classCode: string,
   studentId: string,
@@ -32,19 +41,7 @@ export async function upsertBook(
   const dup = existingBooks.find(
     (b) => b.title.trim() === input.title.trim() && b.author.trim() === input.author.trim(),
   )
-
-  if (dup) {
-    const merged: Partial<Book> = {}
-    for (const [key, value] of Object.entries(input) as [keyof NewBookInput, unknown][]) {
-      const current = (dup as unknown as Record<string, unknown>)[key]
-      const isEmpty = current === undefined || current === null || current === '' || current === false
-      if (isEmpty && value !== undefined && value !== null && value !== '') {
-        ;(merged as Record<string, unknown>)[key] = value
-      }
-    }
-    await updateDoc(doc(db, 'classes', classCode, 'students', studentId, 'books', dup.id), merged)
-    return { book: { ...dup, ...merged }, isNew: false }
-  }
+  if (dup) return { book: dup, isNew: false }
 
   const newBook: Omit<Book, 'id'> = {
     ...input,
@@ -80,4 +77,12 @@ function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
     if (value !== undefined) (result as Record<string, unknown>)[key] = value
   }
   return result
+}
+
+/** 큰 별 지정/해제(마음에 남은 책). 해제하면 이유도 지운다. */
+export async function setBigStar(book: Book, isBigStar: boolean, reason = '') {
+  await updateDoc(doc(db, 'classes', book.classCode, 'students', book.studentId, 'books', book.id), {
+    isBigStar,
+    bigStarReason: isBigStar ? reason.trim().slice(0, 30) : deleteField(),
+  })
 }

@@ -6,12 +6,18 @@ import { requestBookSuggestions, requestGenreTags, type BookSuggestion } from '.
 
 const GENRES = Object.keys(GENRE_COLORS)
 
+/**
+ * 책 등록/수정 폼. 처음 등록할 때는 필수 정보(제목·저자·별점)와 장르만 받는다.
+ * 문장·느낀점·요약 같은 기록은 등록 뒤 책 상세 화면에서 본인·친구가 여러 개씩 더한다.
+ */
 function formHtml(title: string, submitLabel: string, existing?: Book): string {
   const v = (s?: string) => s ?? ''
   return `
     <form class="modal" id="book-form">
       <h2>${title}</h2>
-      <p class="hint">제목·저자·별점만 있어도 별이 생겨요. 나머지는 모두 선택이에요.</p>
+      <p class="hint">${existing
+        ? '책의 기본 정보를 고쳐요. 문장·느낀점 같은 기록은 책 상세 화면에서 더하고 고칠 수 있어요.'
+        : '제목·저자·별점만 넣으면 별이 생겨요. 문장·느낀점 같은 기록은 별을 만든 뒤 얼마든지 더할 수 있어요.'}</p>
 
       <label for="b-title">책 제목 *</label>
       <input id="b-title" required maxlength="80" autocomplete="off" value="${escapeAttr(v(existing?.title))}" />
@@ -20,43 +26,17 @@ function formHtml(title: string, submitLabel: string, existing?: Book): string {
       <label for="b-author">저자 * <span class="badge" id="b-author-badge" hidden>AI 추천</span></label>
       <input id="b-author" required maxlength="40" autocomplete="off" value="${escapeAttr(v(existing?.author))}" />
 
-      <label>장르 <span class="badge" id="b-genre-badge" ${existing?.genre && existing.genreIsAiGuess ? '' : 'hidden'}>AI 추천</span></label>
-      <div class="genre-chips" id="b-genre-chips">
-        ${GENRES.map((g) => `<button type="button" class="genre-chip${existing?.genre === g ? ' selected' : ''}" data-genre="${g}" style="--chip-color:#${GENRE_COLORS[g].toString(16).padStart(6, '0')}">${g}</button>`).join('')}
-      </div>
-      <p class="hint" id="b-keywords">${(existing?.keywords ?? []).map((k) => `#${escapeAttr(k)}`).join(' ')}</p>
-
       <label for="b-rating">별점 *</label>
       <select id="b-rating" required>
         <option value="">선택</option>
         ${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${existing?.rating === n ? 'selected' : ''}>${'★'.repeat(n)}</option>`).join('')}
       </select>
 
-      <p class="hint" style="margin-top:18px">가벼운 활동</p>
-      <div class="activity-grid">
-        <div>
-          <label for="b-quote">인상 깊은 문장</label>
-          <textarea id="b-quote" maxlength="300">${v(existing?.quote)}</textarea>
-        </div>
-        <div>
-          <label for="b-quote-page">쪽수</label>
-          <input id="b-quote-page" placeholder="예: 12-15" value="${escapeAttr(v(existing?.quotePage))}" />
-          <label for="b-reason">읽은 계기</label>
-          <textarea id="b-reason" maxlength="200">${v(existing?.reason)}</textarea>
-        </div>
+      <label>장르 <span class="badge" id="b-genre-badge" ${existing?.genre && existing.genreIsAiGuess ? '' : 'hidden'}>AI 추천</span></label>
+      <div class="genre-chips" id="b-genre-chips">
+        ${GENRES.map((g) => `<button type="button" class="genre-chip${existing?.genre === g ? ' selected' : ''}" data-genre="${g}" style="--chip-color:#${GENRE_COLORS[g].toString(16).padStart(6, '0')}">${g}</button>`).join('')}
       </div>
-      <label><input type="checkbox" id="b-reread" ${existing?.rereadCount ? 'checked' : ''} style="width:auto;display:inline-block;margin-right:6px" />다시 읽은 책이에요</label>
-
-      <p class="hint" style="margin-top:18px">깊은 활동</p>
-      <label for="b-summary">요약</label>
-      <textarea id="b-summary" maxlength="500">${v(existing?.summary)}</textarea>
-      <label for="b-feeling">느낀점</label>
-      <textarea id="b-feeling" maxlength="500">${v(existing?.feeling)}</textarea>
-      <label for="b-inquiry">탐구 질문 (100자 이내)</label>
-      <input id="b-inquiry" maxlength="100" placeholder="더 알고 싶어진 것 한 줄" value="${escapeAttr(v(existing?.inquiryQuestion))}" />
-
-      <label><input type="checkbox" id="b-bigstar" ${existing?.isBigStar ? 'checked' : ''} style="width:auto;display:inline-block;margin-right:6px" />마음에 남은 책 — 큰 별로 지정</label>
-      <input id="b-bigstar-reason" maxlength="30" placeholder="한 줄 이유 (30자 이내)" value="${escapeAttr(v(existing?.bigStarReason))}" style="margin-top:8px" />
+      <p class="hint" id="b-keywords">${(existing?.keywords ?? []).map((k) => `#${escapeAttr(k)}`).join(' ')}</p>
 
       <div style="display:flex; gap:10px; margin-top:20px">
         <button type="button" class="btn secondary" id="b-cancel">취소</button>
@@ -67,20 +47,11 @@ function formHtml(title: string, submitLabel: string, existing?: Book): string {
   `
 }
 
-function readForm(backdrop: HTMLElement) {
+function readRequired(backdrop: HTMLElement) {
   return {
     title: val(backdrop, '#b-title'),
     author: val(backdrop, '#b-author'),
-    ratingRaw: val(backdrop, '#b-rating'),
-    quote: val(backdrop, '#b-quote'),
-    quotePage: val(backdrop, '#b-quote-page'),
-    reason: val(backdrop, '#b-reason'),
-    reread: backdrop.querySelector<HTMLInputElement>('#b-reread')!.checked,
-    summary: val(backdrop, '#b-summary'),
-    feeling: val(backdrop, '#b-feeling'),
-    inquiry: val(backdrop, '#b-inquiry'),
-    isBigStar: backdrop.querySelector<HTMLInputElement>('#b-bigstar')!.checked,
-    bigStarReason: val(backdrop, '#b-bigstar-reason'),
+    rating: Number(val(backdrop, '#b-rating')),
   }
 }
 
@@ -204,6 +175,7 @@ function wireBookAssist(backdrop: HTMLElement, classCode: string, initial: Genre
   return () => state
 }
 
+
 function mountModal(html: string): HTMLElement {
   const backdrop = document.createElement('div')
   backdrop.className = 'modal-backdrop'
@@ -215,10 +187,13 @@ function mountModal(html: string): HTMLElement {
   return backdrop
 }
 
+const REQUIRED_MESSAGE = '제목, 저자, 별점만 있으면 별이 생겨요 — 세 가지는 꼭 채워주세요.'
+
+/** 새 별 만들기. 같은 책을 이미 등록했으면 새 별을 만들지 않고 기존 별을 돌려준다(isNew=false). */
 export function openBookForm(
   classCode: string,
   studentId: string,
-  onSaved: (book: Book) => void,
+  onSaved: (book: Book, isNew: boolean) => void,
 ) {
   const backdrop = mountModal(formHtml('📖 책으로 별 만들기', '별 만들기'))
   const form = backdrop.querySelector<HTMLFormElement>('#book-form')!
@@ -231,9 +206,9 @@ export function openBookForm(
     const submitBtn = backdrop.querySelector<HTMLButtonElement>('#b-submit')!
     errorEl.textContent = ''
 
-    const f = readForm(backdrop)
-    if (!f.title || !f.author || !f.ratingRaw) {
-      errorEl.textContent = '제목, 저자, 별점만 있어도 별이 생겨요 — 세 가지는 꼭 채워주세요.'
+    const f = readRequired(backdrop)
+    if (!f.title || !f.author || !f.rating) {
+      errorEl.textContent = REQUIRED_MESSAGE
       return
     }
 
@@ -243,7 +218,7 @@ export function openBookForm(
       if (!genre) {
         // 아직 추천을 못 받았거나 장르를 고르지 않았으면 저장 직전에 한 번 더 AI에게 묻는다
         submitBtn.textContent = 'AI가 장르를 살펴보는 중...'
-        const tags = await requestGenreTags(classCode, f.title, f.author, f.quote)
+        const tags = await requestGenreTags(classCode, f.title, f.author)
         genre = tags.genre
         keywords = tags.keywords
         isAiGuess = true
@@ -252,34 +227,16 @@ export function openBookForm(
       const input: NewBookInput = {
         title: f.title,
         author: f.author,
-        rating: Number(f.ratingRaw),
-        quote: f.quote || undefined,
-        quotePage: f.quotePage || undefined,
-        reason: f.reason || undefined,
-        rereadCount: f.reread ? 1 : undefined,
-        summary: f.summary || undefined,
-        feeling: f.feeling || undefined,
-        inquiryQuestion: f.inquiry || undefined,
-        isBigStar: f.isBigStar || undefined,
-        bigStarReason: f.bigStarReason || undefined,
+        rating: f.rating,
         genre,
         genreIsAiGuess: isAiGuess, // 학생이 직접 고른 장르면 'AI 추정' 표시를 하지 않는다
         keywords,
       }
-
-      const { book } = await upsertBook(classCode, studentId, input)
-
-      let dust = STAR_DUST_RULES.registerBook
-      if (f.quote) dust += STAR_DUST_RULES.quote
-      if (f.reason) dust += STAR_DUST_RULES.reason
-      if (f.reread) dust += STAR_DUST_RULES.reread
-      if (f.summary) dust += STAR_DUST_RULES.summary
-      if (f.feeling) dust += STAR_DUST_RULES.feeling
-      if (f.inquiry) dust += STAR_DUST_RULES.inquiryQuestion
-      await earnStarDust(classCode, studentId, dust)
+      const { book, isNew } = await upsertBook(classCode, studentId, input)
+      if (isNew) await earnStarDust(classCode, studentId, STAR_DUST_RULES.registerBook)
 
       backdrop.remove()
-      onSaved(book)
+      onSaved(book, isNew)
     } catch (err) {
       errorEl.textContent = err instanceof Error ? err.message : String(err)
       submitBtn.disabled = false
@@ -288,7 +245,7 @@ export function openBookForm(
   })
 }
 
-/** 학생 본인이 이미 등록한 책 내용을 고친다. 별가루는 다시 지급하지 않는다. */
+/** 책 기본 정보(제목·저자·별점·장르)를 고친다. 별가루는 다시 지급하지 않는다. */
 export function openEditBook(
   classCode: string,
   studentId: string,
@@ -309,30 +266,22 @@ export function openEditBook(
     const submitBtn = backdrop.querySelector<HTMLButtonElement>('#b-submit')!
     errorEl.textContent = ''
 
-    const f = readForm(backdrop)
-    if (!f.title || !f.author || !f.ratingRaw) {
-      errorEl.textContent = '제목, 저자, 별점만 있어도 별이 생겨요 — 세 가지는 꼭 채워주세요.'
+    const f = readRequired(backdrop)
+    if (!f.title || !f.author || !f.rating) {
+      errorEl.textContent = REQUIRED_MESSAGE
       return
     }
 
     submitBtn.disabled = true
     try {
+      const g = getGenre()
       const patch: NewBookInput = {
         title: f.title,
         author: f.author,
-        rating: Number(f.ratingRaw),
-        quote: f.quote || undefined,
-        quotePage: f.quotePage || undefined,
-        reason: f.reason || undefined,
-        rereadCount: f.reread ? 1 : undefined,
-        summary: f.summary || undefined,
-        feeling: f.feeling || undefined,
-        inquiryQuestion: f.inquiry || undefined,
-        isBigStar: f.isBigStar || undefined,
-        bigStarReason: f.bigStarReason || undefined,
-        genre: getGenre().genre ?? existing.genre,
-        genreIsAiGuess: getGenre().genre ? getGenre().isAiGuess : existing.genreIsAiGuess,
-        keywords: getGenre().keywords,
+        rating: f.rating,
+        genre: g.genre ?? existing.genre,
+        genreIsAiGuess: g.genre ? g.isAiGuess : existing.genreIsAiGuess,
+        keywords: g.keywords,
       }
       await updateBook(classCode, studentId, existing.id, patch)
       backdrop.remove()
