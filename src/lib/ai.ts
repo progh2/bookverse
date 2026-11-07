@@ -40,3 +40,32 @@ export async function requestGenreTags(
   const fallback = guessGenre(title)
   return { ...fallback, source: 'fallback' }
 }
+
+export interface BookCandidate {
+  title: string
+  author: string
+}
+
+export interface BookSuggestion {
+  candidates: BookCandidate[]
+  genre: string
+  keywords: string[]
+  source: 'ai' | 'fallback'
+}
+
+/**
+ * 제목을 입력하는 도중 AI에게 실제 책 후보(제목+저자)와 장르를 추천받는다.
+ * 키가 없거나 실패하면 후보 없이 로컬 추정 장르만 돌려준다(학생이 직접 입력하면 됨).
+ */
+export async function requestBookSuggestions(classCode: string, title: string): Promise<BookSuggestion> {
+  try {
+    const call = httpsCallable<{ classCode: string; title: string }, Omit<BookSuggestion, 'source'>>(
+      functions, 'suggestBookInfo',
+    )
+    const res = await call({ classCode, title })
+    if (res.data) return { ...res.data, source: 'ai' }
+  } catch {
+    // 키 미설정·상한 도달·네트워크 오류 — 폴백
+  }
+  return { candidates: [], ...guessGenre(title), source: 'fallback' }
+}

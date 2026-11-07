@@ -538,3 +538,46 @@ textarea { min-height: 70px; resize: vertical; }
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
+
+/* ===== 책 등록: AI 책 추천 + 장르 고르기 ===== */
+.suggest-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 214, 107, 0.06);
+  border: 1px dashed rgba(255, 214, 107, 0.35);
+}
+.suggest-box .hint { width: 100%; margin: 0; }
+.suggest-chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 214, 107, 0.5);
+  background: rgba(255, 214, 107, 0.1);
+  color: var(--text);
+  cursor: pointer;
+}
+.suggest-chip:hover { background: rgba(255, 214, 107, 0.22); }
+.genre-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.genre-chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.genre-chip.selected {
+  border-color: var(--chip-color);
+  color: var(--chip-color);
+  background: color-mix(in srgb, var(--chip-color) 15%, transparent);
+  font-weight: 700;
+}
