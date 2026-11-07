@@ -30,6 +30,8 @@ async function dispatch() {
   if (!outlet) return
   if (typeof currentCleanup === 'function') currentCleanup()
   currentCleanup = undefined
+  // 팝업은 body에 붙어 있어서 화면을 옮겨도 남는다 — 화면 전환 때 함께 닫는다
+  document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove())
 
   await playExitTransition(outlet)
 
