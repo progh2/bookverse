@@ -9,6 +9,7 @@ import { state } from '../state'
 import { navigate } from '../router'
 import { openBookPost } from './BookPostModal'
 import { GENRE_COLORS, type Book, type Student } from '../types'
+import { characterSvg } from '../characters'
 
 const CLUSTER_SCALE = 0.7 // 학생 한 명의 별자리를 원 위에 올릴 때의 축소 비율
 const ROTATE_SPEED = 0.025 // rad/s — 한 바퀴 약 4분
@@ -72,6 +73,9 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   const entries: { book: Book; position: THREE.Vector3 }[] = []
   const solidPairs: [THREE.Vector3, THREE.Vector3][] = []
   const labels: { text: string; position: THREE.Vector3 }[] = []
+  const nebulae: { position: THREE.Vector3; color: number; size: number }[] = []
+  const avatars: { svg: string; position: THREE.Vector3; size: number }[] = []
+  const labelScale = Math.max(1, cameraDistance / 24)
 
   studentIds.forEach((studentId, idx) => {
     const studentBooks = byStudent.get(studentId)!
@@ -104,16 +108,27 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
       if (pa && pb) solidPairs.push([pa, pb])
     }
 
-    const labelPos = center.clone()
-    labelPos.setLength(radius + 3.8)
+    // 원 바깥쪽으로 캐릭터 → 그 바깥에 닉네임 순서로 놓는다(원이 돌아도 항상 바깥을 향함)
+    const avatarPos = center.clone().setLength(radius + 3.0)
+    avatarPos.z = center.z
+    avatars.push({ svg: characterSvg(student?.character, 200), position: avatarPos, size: 1.15 * labelScale })
+    const labelPos = center.clone().setLength(radius + 3.0 + 1.3 * labelScale)
     labelPos.z = center.z
     labels.push({ text: student?.nickname ?? '알 수 없음', position: labelPos })
+
+    // 가장 많이 읽은 장르 색으로 그 학생 별자리 뒤에 은은한 성운을 깐다
+    const genreCount = new Map<string, number>()
+    for (const b of studentBooks) genreCount.set(b.genre ?? '기타', (genreCount.get(b.genre ?? '기타') ?? 0) + 1)
+    const topGenre = [...genreCount.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    nebulae.push({ position: center.clone(), color: GENRE_COLORS[topGenre] ?? GENRE_COLORS['기타'], size: 7 + Math.min(studentBooks.length, 10) * 0.4 })
   })
 
   scene.setStars(entries)
   scene.setConnections(solidPairs)
   // 원이 클수록 카메라가 멀어져 글씨가 작아지므로 그만큼 이름표를 키운다
-  scene.setLabels(labels, Math.max(1, cameraDistance / 24))
+  scene.setNebulae(nebulae)
+  scene.setAvatars(avatars)
+  scene.setLabels(labels, labelScale)
 
   // 같은 문장에 밑줄 친 서로 다른 학생끼리는 연한 점선으로 느슨하게 잇는다
   // (책마다 남긴 문장들의 정규화 키 quoteKeys를 책 문서에 함께 저장해 두므로 기록을 따로 읽지 않아도 된다)

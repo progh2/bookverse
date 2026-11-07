@@ -36,6 +36,7 @@ export interface Student {
   constellationTemplate: TemplateId
   starPositions?: Record<string, StarPosition> // bookId -> 직접 배치한 좌표(편집기에서 저장)
   starLines?: StarLine[] // 편집기에서 직접 이은 선(Firestore는 중첩 배열을 못 담아 객체 배열로 저장)
+  character?: string // 프로필 캐릭터 id(src/characters.ts), 없으면 기본 캐릭터
   starDust: number
   dailyEarned: number
   lastEarnDate: string // YYYY-MM-DD (KST)

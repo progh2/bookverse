@@ -10,6 +10,8 @@ import { openBookPost } from './BookPostModal'
 import { openConstellationEditor } from './ConstellationEditor'
 import type { Book } from '../types'
 import { saveSession } from '../lib/session'
+import { CHARACTERS, characterSpec, characterSvg, readerTitle } from '../characters'
+import { setCharacter } from '../lib/students'
 
 export async function renderConstellation(container: HTMLElement): Promise<() => void> {
   if (!state.session) {
@@ -19,15 +21,23 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
 
   container.innerHTML = `
     <div class="view">
-      <div class="star-canvas-wrap" id="star-wrap">
-        <div class="hud" id="hud">불러오는 중...</div>
-        <button class="fab" id="add-book">+ 책으로 별 만들기</button>
+      <div class="my-sky">
+        <aside class="profile-card" id="profile-card"><p class="hint">불러오는 중...</p></aside>
+        <section class="my-sky-main">
+          <header class="my-sky-header">
+            <h1>나의 별자리</h1>
+            <p>책 속 문장이 모여, 나만의 우주가 돼요</p>
+          </header>
+          <div class="star-canvas-wrap" id="star-wrap">
+            <button class="fab" id="add-book">✦ 책으로 별 만들기</button>
+          </div>
+        </section>
       </div>
     </div>
   `
 
   const wrap = container.querySelector<HTMLElement>('#star-wrap')!
-  const hud = container.querySelector<HTMLElement>('#hud')!
+  const hud = container.querySelector<HTMLElement>('#profile-card')!
 
   if (!state.student) {
     state.student = await getStudent(state.session.classCode, state.session.studentId)
@@ -64,19 +74,32 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
       .filter((pair): pair is [import('three').Vector3, import('three').Vector3] => !!pair[0] && !!pair[1])
     scene.setConnections(connectionPairs)
 
+    const student = state.student!
     hud.innerHTML = `
-      <div><strong>${escapeHtml(state.student!.nickname)}</strong>님의 별자리 (${templateLabel(state.student!.constellationTemplate)})
+      <div class="profile-card-top">
+        <span>내 프로필</span>
         <button id="edit-nickname" class="hud-icon-btn" title="닉네임 수정">✏️</button>
       </div>
-      <div>별 ${currentBooks.length}개 · 별가루 <span class="dust">${state.student!.starDust}✨</span></div>
-      <div style="margin-top:4px; display:flex; gap:10px; flex-wrap:wrap">
-        <a href="#/class" style="color:var(--line-blue)">학급 성운 보기 →</a>
-        <a href="#/board" style="color:var(--line-blue)">게시판 →</a>
-        <button id="open-editor" class="hud-icon-btn" style="text-decoration:underline">🪄 별자리 편집</button>
-        <button id="toggle-3d" class="hud-icon-btn" style="text-decoration:underline">${toggle3dButtonLabel()}</button>
+      <div class="profile-character">${characterSvg(student.character, 180)}</div>
+      <div class="profile-name">${escapeHtml(student.nickname)}</div>
+      <div class="profile-sub">${templateLabel(student.constellationTemplate)}</div>
+      <span class="profile-title">${readerTitle(currentBooks.length)}</span>
+      <div class="profile-stats">
+        <div><span>별</span><strong>${currentBooks.length}개</strong></div>
+        <div><span>별가루</span><strong>${student.starDust}</strong></div>
+      </div>
+      <button class="btn secondary profile-btn" id="change-character">캐릭터 바꾸기</button>
+      <div class="profile-actions">
+        <button id="open-editor" class="hud-icon-btn">🪄 별자리 편집</button>
+        <button id="toggle-3d" class="hud-icon-btn">${toggle3dButtonLabel()}</button>
+      </div>
+      <div class="profile-links">
+        <a href="#/class">학급 성운 보기 →</a>
+        <a href="#/board">게시판 →</a>
       </div>
     `
     hud.querySelector('#edit-nickname')!.addEventListener('click', openNicknameEditor)
+    hud.querySelector('#change-character')!.addEventListener('click', openCharacterPicker)
     hud.querySelector('#open-editor')!.addEventListener('click', () => {
       openConstellationEditor(state.session!.classCode, state.session!.studentId, state.student!, currentBooks, async () => {
         state.student = await getStudent(state.session!.classCode, state.session!.studentId)
@@ -88,6 +111,38 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
       scene.setRotationLocked(rotationLocked)
       const btn = hud.querySelector('#toggle-3d')
       if (btn) btn.textContent = toggle3dButtonLabel()
+    })
+  }
+
+  function openCharacterPicker() {
+    const current = characterSpec(state.student!.character).id
+    const backdrop = document.createElement('div')
+    backdrop.className = 'modal-backdrop'
+    backdrop.innerHTML = `
+      <div class="modal" style="width:min(560px,100%)">
+        <h2>캐릭터 바꾸기</h2>
+        <p class="hint">내 별자리와 학급 성운에서 나를 대신할 캐릭터를 골라요.</p>
+        <div class="character-grid">
+          ${CHARACTERS.map((c) => `
+            <button type="button" class="character-option${c.id === current ? ' selected' : ''}" data-id="${c.id}">
+              ${characterSvg(c.id, 96)}
+              <span>${c.name}</span>
+            </button>`).join('')}
+        </div>
+        <button type="button" class="btn secondary" id="character-close">닫기</button>
+      </div>
+    `
+    document.body.appendChild(backdrop)
+    const close = () => backdrop.remove()
+    backdrop.querySelector('#character-close')!.addEventListener('click', close)
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close() })
+    backdrop.querySelectorAll<HTMLButtonElement>('.character-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await setCharacter(state.session!.classCode, state.session!.studentId, btn.dataset.id!)
+        state.student!.character = btn.dataset.id!
+        close()
+        await refresh()
+      })
     })
   }
 

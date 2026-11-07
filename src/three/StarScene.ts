@@ -35,6 +35,8 @@ export class StarScene {
   private lines: THREE.Line[] = []
   private dashedLines: THREE.Line[] = []
   private labels: THREE.Sprite[] = []
+  private nebulae: THREE.Sprite[] = []
+  private avatars: THREE.Sprite[] = []
   private clock = new THREE.Clock()
   private disposed = false
   private container: HTMLElement
@@ -160,6 +162,45 @@ export class StarScene {
       sprite.position.copy(position)
       this.root.add(sprite)
       this.labels.push(sprite)
+    }
+  }
+
+  /** 별자리마다 뒤에 깔리는 은은한 색 성운(학급 성운의 "성운 덩어리" 느낌). */
+  setNebulae(nebulae: { position: THREE.Vector3; color: number; size: number }[]) {
+    for (const n of this.nebulae) this.root.remove(n)
+    this.nebulae = []
+    for (const { position, color, size } of nebulae) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: getGlowTexture(), color, transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, opacity: 0.22,
+      }))
+      sprite.scale.set(size, size, 1)
+      sprite.position.copy(position)
+      sprite.renderOrder = -1
+      this.root.add(sprite)
+      this.nebulae.push(sprite)
+    }
+  }
+
+  /** SVG 그림(캐릭터 등)을 별자리 옆에 띄운다. 이미지가 로드되면 그때 보인다. */
+  setAvatars(avatars: { svg: string; position: THREE.Vector3; size: number }[]) {
+    for (const a of this.avatars) {
+      this.root.remove(a)
+      a.material.map?.dispose()
+      a.material.dispose()
+    }
+    this.avatars = []
+    for (const { svg, position, size } of avatars) {
+      const img = new Image()
+      const texture = new THREE.Texture(img)
+      texture.colorSpace = THREE.SRGBColorSpace
+      img.onload = () => { texture.needsUpdate = true }
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }))
+      sprite.scale.set(size, size * 1.1, 1)
+      sprite.position.copy(position)
+      this.root.add(sprite)
+      this.avatars.push(sprite)
     }
   }
 

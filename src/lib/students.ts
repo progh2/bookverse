@@ -70,6 +70,11 @@ export async function earnStarDust(classCode: string, studentId: string, amount:
 }
 
 /** 별자리 템플릿을 바꾼다(편집기에서 템플릿을 다시 고를 때). 기존 커스텀 배치는 초기화된다. */
+/** 프로필 캐릭터를 바꾼다(학급별 멤버십 문서에 저장). */
+export async function setCharacter(classCode: string, studentId: string, character: string) {
+  await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { character })
+}
+
 export async function setConstellationTemplate(classCode: string, studentId: string, template: TemplateId) {
   await updateDoc(doc(db, 'classes', classCode, 'students', studentId), {
     constellationTemplate: template,
