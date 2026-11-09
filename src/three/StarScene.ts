@@ -404,11 +404,14 @@ function reducedMotion(): boolean {
 }
 
 function makeTextSprite(text: string): THREE.Sprite {
+  const font = "bold 52px 'Pretendard', system-ui, sans-serif"
   const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 128
   const ctx = canvas.getContext('2d')!
-  ctx.font = "bold 52px 'Pretendard', system-ui, sans-serif"
+  ctx.font = font
+  // 긴 이름(예: "2학년 3반 (데모) · MB7B5X")도 잘리지 않게 글자 폭에 맞춰 캔버스를 넓힌다
+  canvas.width = Math.max(512, Math.ceil(ctx.measureText(text).width) + 48)
+  canvas.height = 128
+  ctx.font = font // 캔버스 크기를 바꾸면 그리기 설정이 초기화된다
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.shadowColor = 'rgba(15, 27, 61, 0.9)'
@@ -420,6 +423,6 @@ function makeTextSprite(text: string): THREE.Sprite {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: texture, transparent: true, depthWrite: false,
   }))
-  sprite.scale.set(4, 1, 1)
+  sprite.scale.set(4 * (canvas.width / 512), 1, 1)
   return sprite
 }
