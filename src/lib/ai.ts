@@ -69,3 +69,32 @@ export async function requestBookSuggestions(classCode: string, title: string): 
   }
   return { candidates: [], ...guessGenre(title), source: 'fallback' }
 }
+
+export interface CardLines {
+  feeling: string
+  question: string
+  cheer: string
+  source: 'ai' | 'fallback'
+}
+
+/** 한 소절 카드 문구 3종. AI를 못 쓰면 문장과 상관없이 어울리는 기본 문구를 준다. */
+export async function requestCardLines(
+  classCode: string, title: string, author: string, quote: string,
+): Promise<CardLines> {
+  try {
+    const call = httpsCallable<
+      { classCode: string; title: string; author: string; quote: string },
+      Omit<CardLines, 'source'>
+    >(functions, 'suggestCardLines')
+    const res = await call({ classCode, title, author, quote })
+    if (res.data?.feeling) return { ...res.data, source: 'ai' }
+  } catch {
+    // 키 미설정·상한 도달·네트워크 오류 — 폴백
+  }
+  return {
+    feeling: '오래 머물고 싶은 문장',
+    question: '이 문장은 지금의 나에게 무슨 말을 할까?',
+    cheer: '오늘도 한 문장만큼 자란 나에게',
+    source: 'fallback',
+  }
+}

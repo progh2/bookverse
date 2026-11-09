@@ -1,10 +1,20 @@
 import {
   computeBrightness, ENTRY_TYPES, entryTypeInfo, type Book, type BookEntry, type EntryType,
 } from '../types'
-import { addEntry, deleteEntry, listEntries, updateEntry, type Viewer } from '../lib/entries'
-import { getBook, listBooks, setBigStar } from '../lib/books'
+import { addEntry, deleteEntry, listEntries, MAX_IMAGE_LENGTH, updateEntry, type Viewer } from '../lib/entries'
+import { deleteBook, getBook, listBooks, setBigStar } from '../lib/books'
+import { isTeacherOf } from '../lib/classes'
+import { clearDraft, loadDraft, saveDraft } from '../lib/drafts'
+import { compressImage } from '../lib/image'
 import { formatDateTime, toMillis } from '../lib/time'
 import { openEditBook } from './BookFormModal'
+import { openQuoteCard } from './QuoteCard'
+
+interface EntryDraft {
+  type: EntryType
+  text: string
+  page: string
+}
 
 interface PostOptions {
   authorNickname: string // 책 주인 닉네임
@@ -20,9 +30,13 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
   const { viewer } = opts
   let book = initialBook
   let entries: BookEntry[] = []
-  let selectedType: EntryType = 'quote'
   let editingId: string | null = null
+  let teacher = false // 담당 교사로 로그인했으면 모든 기록·책을 지울 수 있다
+  let photo: string | null = null // 고른 필사 사진(줄인 data URL)
   const isMine = book.studentId === viewer.studentId
+  // 작성 중인 기록은 책·작성자별로 임시저장해 두었다가 다시 열면 이어서 쓴다
+  const draftKey = `entry.${book.classCode}.${book.id}.${viewer.studentId}`
+  const draft: EntryDraft = { type: 'quote', text: '', page: '', ...loadDraft<EntryDraft>(draftKey) }
 
   const backdrop = document.createElement('div')
   backdrop.className = 'modal-backdrop'
@@ -64,6 +78,11 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
           <button class="btn secondary" id="post-bigstar" style="width:auto; margin-top:0">${book.isBigStar ? '큰 별 해제' : '🌟 큰 별로 지정'}</button>
         </div>
         <p class="error-text" id="bigstar-msg"></p>` : ''}
+      ${teacher ? `
+        <div class="teacher-bar">
+          <span>👩‍🏫 교사 관리</span>
+          <button class="btn secondary" id="post-delete-book" style="width:auto; margin-top:0; color:#ff8a8a">🗑 이 책(별) 삭제</button>
+        </div>` : ''}
     `
   }
 
@@ -83,17 +102,21 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
     }
     const body = e.type === 'quote'
       ? `<div class="entry-quote">“${escapeHtml(e.text)}”</div>${e.page ? `<div class="hint">${escapeHtml(e.page)}쪽</div>` : ''}`
-      : `<div style="white-space:pre-wrap">${escapeHtml(e.text || '다시 읽었어요 🔁')}</div>`
+      : e.type === 'photo'
+        ? `${safeImage(e.image) ? `<img class="entry-photo" src="${safeImage(e.image)}" alt="필사 사진" loading="lazy" />` : '<p class="hint">사진을 불러올 수 없어요</p>'}
+           ${e.text ? `<div style="white-space:pre-wrap; margin-top:6px">${escapeHtml(e.text)}</div>` : ''}`
+        : `<div style="white-space:pre-wrap">${escapeHtml(e.text || '다시 읽었어요 🔁')}</div>`
     return `
       <div class="entry-card" data-id="${e.id}">
         ${body}
         <div class="entry-meta">
           <span>${escapeHtml(e.authorNickname)}${e.authorId === book.studentId ? ' <span class="badge">책 주인</span>' : ''}
             · ${formatDateTime(toMillis(e.createdAt))}${e.updatedAt ? ' (수정됨)' : ''}</span>
-          ${mine ? `<span>
-            <button class="hud-icon-btn entry-edit" title="고치기">✏️</button>
-            <button class="hud-icon-btn entry-delete" title="지우기">🗑</button>
-          </span>` : ''}
+          <span>
+            ${e.type === 'quote' ? '<button class="hud-icon-btn entry-card-btn" title="한 소절 카드 만들기">🃏 카드</button>' : ''}
+            ${mine ? '<button class="hud-icon-btn entry-edit" title="고치기">✏️</button>' : ''}
+            ${mine || teacher ? `<button class="hud-icon-btn entry-delete" title="${mine ? '지우기' : '교사 삭제'}">🗑</button>` : ''}
+          </span>
         </div>
       </div>`
   }
@@ -112,6 +135,7 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
   }
 
   function formHtml(): string {
+    const selectedType = draft.type
     const info = entryTypeInfo(selectedType)
     return `
       <form id="entry-form" class="entry-form">
@@ -119,8 +143,14 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
         <div class="genre-chips">
           ${ENTRY_TYPES.map((t) => `<button type="button" class="genre-chip entry-type${t.type === selectedType ? ' selected' : ''}" data-type="${t.type}" style="--chip-color:var(--star-yellow)">${t.icon} ${t.label}</button>`).join('')}
         </div>
-        <textarea id="entry-text" maxlength="${info.maxLength}" placeholder="${info.placeholder}" style="margin-top:8px; min-height:64px"></textarea>
-        ${selectedType === 'quote' ? '<input id="entry-page" placeholder="쪽수(선택, 예: 12-15)" style="margin-top:6px" />' : ''}
+        ${selectedType === 'photo' ? `
+          <label class="photo-pick">
+            <input type="file" id="entry-photo" accept="image/*" hidden />
+            ${photo ? `<img src="${photo}" alt="고른 사진" />` : '<span>📷 필사한 노트·책 사진 고르기</span>'}
+          </label>` : ''}
+        <textarea id="entry-text" maxlength="${info.maxLength}" placeholder="${info.placeholder}" style="margin-top:8px; min-height:${selectedType === 'photo' ? 40 : 64}px">${escapeHtml(draft.text)}</textarea>
+        ${selectedType === 'quote' ? `<input id="entry-page" placeholder="쪽수(선택, 예: 12-15)" value="${escapeHtml(draft.page)}" style="margin-top:6px" />` : ''}
+        ${draft.text ? '<div class="hint draft-hint">💾 쓰던 글을 임시저장해 두었어요</div>' : ''}
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; gap:8px">
           <span class="hint" id="entry-msg">${isMine ? '처음 남기는 종류는 별가루를 받고 별이 밝아져요' : '친구 책에 기록을 남기면 별가루를 받아요'}</span>
           <button class="btn" type="submit" id="entry-submit" style="width:auto; margin-top:0; padding:8px 16px">남기기</button>
@@ -174,26 +204,60 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
       await refresh()
     })
 
+    modal.querySelector('#post-delete-book')?.addEventListener('click', async () => {
+      if (!confirm(`『${book.title}』 별과 거기 달린 기록을 모두 지울까요? 되돌릴 수 없어요.`)) return
+      await deleteBook(book)
+      close()
+      opts.onChanged?.()
+    })
+
     modal.querySelectorAll<HTMLButtonElement>('.entry-type').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const text = modal.querySelector<HTMLTextAreaElement>('#entry-text')!.value
-        selectedType = btn.dataset.type as EntryType
+        draft.type = btn.dataset.type as EntryType
+        saveDraft(draftKey, draft)
         render()
-        modal.querySelector<HTMLTextAreaElement>('#entry-text')!.value = text
         modal.querySelector<HTMLTextAreaElement>('#entry-text')!.focus()
       })
+    })
+
+    const textEl = modal.querySelector<HTMLTextAreaElement>('#entry-text')!
+    const pageEl = modal.querySelector<HTMLInputElement>('#entry-page')
+    const persist = () => {
+      draft.text = textEl.value
+      draft.page = pageEl?.value ?? draft.page
+      if (draft.text || draft.page) saveDraft(draftKey, draft)
+      else clearDraft(draftKey)
+    }
+    textEl.addEventListener('input', persist)
+    pageEl?.addEventListener('input', persist)
+
+    modal.querySelector<HTMLInputElement>('#entry-photo')?.addEventListener('change', async (ev) => {
+      const file = (ev.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      const errorEl = modal.querySelector<HTMLElement>('#entry-error')!
+      try {
+        errorEl.textContent = '사진을 줄이는 중...'
+        photo = await compressImage(file, MAX_IMAGE_LENGTH)
+        render()
+      } catch (err) {
+        errorEl.textContent = err instanceof Error ? err.message : String(err)
+      }
     })
 
     modal.querySelector('#entry-form')!.addEventListener('submit', async (ev) => {
       ev.preventDefault()
       const errorEl = modal.querySelector<HTMLElement>('#entry-error')!
       const submitBtn = modal.querySelector<HTMLButtonElement>('#entry-submit')!
-      const text = modal.querySelector<HTMLTextAreaElement>('#entry-text')!.value
-      const page = modal.querySelector<HTMLInputElement>('#entry-page')?.value ?? ''
+      const text = textEl.value
+      const page = pageEl?.value ?? ''
       errorEl.textContent = ''
       submitBtn.disabled = true
       try {
-        const granted = await addEntry(book, viewer, selectedType, text, page)
+        const granted = await addEntry(book, viewer, draft.type, text, page, photo ?? undefined)
+        clearDraft(draftKey)
+        draft.text = ''
+        draft.page = ''
+        photo = null
         await refresh()
         modal.querySelector<HTMLElement>('#entry-msg')!.textContent = granted > 0
           ? `✨ 별가루 +${granted}`
@@ -202,6 +266,10 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
         errorEl.textContent = err instanceof Error ? err.message : String(err)
         submitBtn.disabled = false
       }
+    })
+
+    modal.querySelectorAll<HTMLImageElement>('.entry-photo').forEach((img) => {
+      img.addEventListener('click', () => img.classList.toggle('zoomed'))
     })
 
     modal.querySelectorAll<HTMLElement>('.entry-card').forEach((card) => {
@@ -219,6 +287,17 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
           alert(err instanceof Error ? err.message : String(err))
         }
       })
+      card.querySelector('.entry-card-btn')?.addEventListener('click', () => {
+        openQuoteCard({
+          classCode: viewer.classCode,
+          quote: entry.text,
+          page: entry.page,
+          title: book.title,
+          author: book.author,
+          genre: book.genre,
+          nickname: entry.authorNickname,
+        })
+      })
       card.querySelector('.entry-delete')?.addEventListener('click', async () => {
         if (!confirm('이 기록을 지울까요?')) return
         await deleteEntry(book, entry)
@@ -230,6 +309,16 @@ export function openBookPost(initialBook: Book, opts: PostOptions) {
   render()
   modal.querySelector('#entry-list')!.innerHTML = '<p class="hint">불러오는 중...</p>'
   void refresh(false)
+  void isTeacherOf(book.classCode).then((yes) => {
+    if (!yes || !backdrop.isConnected) return
+    teacher = true
+    render()
+  })
+}
+
+/** 사진은 우리가 만든 JPEG data URL만 그린다(다른 주소를 끼워 넣은 기록 방어). */
+function safeImage(url?: string): string | null {
+  return url && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(url) ? url : null
 }
 
 function escapeHtml(s: string): string {

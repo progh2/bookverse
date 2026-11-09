@@ -10,6 +10,7 @@ import { navigate } from '../router'
 import { openBookPost } from './BookPostModal'
 import { GENRE_COLORS, type Book, type Student } from '../types'
 import { characterIdFor, characterSvg } from '../characters'
+import { resolveStarStyle } from '../shop'
 
 const CLUSTER_SCALE = 0.7 // 학생 한 명의 별자리를 원 위에 올릴 때의 축소 비율
 const ROTATE_SPEED = 0.025 // rad/s — 한 바퀴 약 4분
@@ -70,8 +71,8 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     },
   })
 
-  const entries: { book: Book; position: THREE.Vector3 }[] = []
-  const solidPairs: [THREE.Vector3, THREE.Vector3][] = []
+  const entries: { book: Book; position: THREE.Vector3; style: ReturnType<typeof resolveStarStyle> }[] = []
+  const solidPairs: [THREE.Vector3, THREE.Vector3, number][] = []
   const labels: { text: string; position: THREE.Vector3 }[] = []
   const nebulae: { position: THREE.Vector3; color: number; size: number }[] = []
   const avatars: { svg: string; position: THREE.Vector3; size: number }[] = []
@@ -90,12 +91,13 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     const cy = localPositions.reduce((s, p) => s + p.y, 0) / localPositions.length
 
     const worldById = new Map<string, THREE.Vector3>()
+    const style = resolveStarStyle(student?.starStyle) // 상점에서 산 꾸미기를 성운에서도 보여 준다
     studentBooks.forEach((book, i) => {
       const p = localPositions[i].clone()
       p.x -= cx
       p.y -= cy
       p.multiplyScalar(CLUSTER_SCALE).add(center)
-      entries.push({ book, position: p })
+      entries.push({ book, position: p, style })
       worldById.set(book.id, p)
     })
 
@@ -105,7 +107,7 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
     for (const { a, b } of lines) {
       const pa = worldById.get(a)
       const pb = worldById.get(b)
-      if (pa && pb) solidPairs.push([pa, pb])
+      if (pa && pb) solidPairs.push([pa, pb, style.lineColor])
     }
 
     // 원 바깥쪽으로 캐릭터 → 그 바깥에 닉네임 순서로 놓는다(원이 돌아도 항상 바깥을 향함)

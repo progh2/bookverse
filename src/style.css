@@ -721,3 +721,94 @@ textarea { min-height: 70px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   .profile-character .character-svg, .profile-character .character-star { animation: none !important; }
 }
+
+/* ===== 교사 관리·필사 사진·임시저장 ===== */
+.teacher-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 138, 138, 0.08);
+  border: 1px dashed rgba(255, 138, 138, 0.4);
+  font-size: 13px;
+}
+.entry-photo {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+.entry-photo.zoomed { max-height: none; cursor: zoom-out; }
+.photo-pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  margin-top: 8px;
+  border: 1px dashed rgba(255, 214, 107, 0.45);
+  border-radius: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+  overflow: hidden;
+}
+.photo-pick img { max-width: 100%; max-height: 200px; }
+.draft-hint { margin-top: 4px; color: #9fd8a8; }
+
+/* ===== 한 소절 카드 ===== */
+.card-modal { width: min(520px, 100%); }
+.card-preview {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.card-preview canvas {
+  max-width: 100%;
+  max-height: 46vh;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== 별가루 상점 ===== */
+.shop-modal { width: min(640px, 100%); }
+.shop-balance { color: var(--star-yellow); font-size: 16px; }
+.shop-msg { min-height: 1em; color: var(--star-yellow); }
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.shop-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
+  font-size: 13px;
+}
+.shop-item.applied { border-color: var(--star-yellow); background: rgba(255, 214, 107, 0.07); }
+.shop-item .btn { width: auto; margin-top: 4px; padding: 6px 14px; font-size: 13px; }
+.shop-preview { height: 48px; display: flex; align-items: center; }
+.shop-preview img { width: 46px; height: 46px; }
+.shop-btn { margin-top: 0; }
+
+/* ===== 은하 ===== */
+.galaxy-hud { max-width: min(460px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow: auto; }
+.galaxy-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+.galaxy-table th, .galaxy-table td { padding: 4px 6px; text-align: right; white-space: nowrap; }
+.galaxy-table th:first-child, .galaxy-table td:first-child { text-align: left; white-space: normal; }
+.galaxy-table th { color: var(--text-dim); font-weight: 500; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.galaxy-table tr.mine td { color: var(--star-yellow); font-weight: 700; }
+.galaxy-bar { height: 3px; margin-top: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--line-blue), var(--star-yellow)); }
+.galaxy-pick { top: auto; left: auto; right: 12px; bottom: 12px; max-width: 300px; }

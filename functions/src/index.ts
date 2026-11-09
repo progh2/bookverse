@@ -142,3 +142,34 @@ export const suggestBookInfo = onCall<SuggestBookInfoInput>(async (request) => {
     throw new HttpsError('internal', 'AI_CALL_FAILED')
   }
 })
+
+interface SuggestCardLinesInput {
+  classCode: string
+  title: string
+  author?: string
+  quote: string
+}
+
+/** 한 소절 카드에 넣을 짧은 문구 3종(감상·질문·응원)을 만든다. */
+export const suggestCardLines = onCall<SuggestCardLinesInput>(async (request) => {
+  const { classCode, title, author, quote } = request.data ?? ({} as SuggestCardLinesInput)
+  assertClassCode(classCode)
+  const q = (quote ?? '').trim()
+  if (!q || q.length > 300 || !title || title.length > 80) throw new HttpsError('invalid-argument', 'INVALID_INPUT')
+
+  const apiKey = await takeQuota(classCode)
+  try {
+    const parsed = await askOpenAiJson(apiKey, [
+      `중학생이 책 『${title}』${author ? `(${author})` : ''}에서 밑줄 친 문장으로 카드 이미지를 만들고 있어.`,
+      `문장: "${q}"`,
+      `카드 아래에 들어갈 짧은 한국어 문구를 3가지 버전으로 써줘. 각 25자 이내, 중학생 눈높이, 따뜻하고 담백하게.`,
+      `feeling: 이 문장에서 느껴지는 감상 한 줄 / question: 읽는 사람이 생각해볼 질문 한 줄 / cheer: 오늘의 나에게 건네는 응원 한 줄`,
+      `책 내용을 지어내지 말고 문장 자체에서만 떠올려. JSON으로만 답해: {"feeling":"...","question":"...","cheer":"..."}`,
+    ].join('\n'), 200)
+    const pick = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, 40) : '')
+    return { feeling: pick(parsed.feeling), question: pick(parsed.question), cheer: pick(parsed.cheer) }
+  } catch (err) {
+    if (err instanceof HttpsError) throw err
+    throw new HttpsError('internal', 'AI_CALL_FAILED')
+  }
+})

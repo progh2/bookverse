@@ -56,7 +56,7 @@ service cloud.firestore {
           allow update: if isValidBook(request.resource.data);
           allow delete: if true;
 
-          // 책 하나에 여러 개씩 다는 기록(문장·느낀점·요약·계기·탐구질문·다시읽음·의견).
+          // 책 하나에 여러 개씩 다는 기록(문장·느낀점·요약·계기·탐구질문·다시읽음·필사 사진·의견).
           // 책 주인과 친구 모두 작성 가능. 고칠 때 작성자·종류는 못 바꾼다.
           match /entries/{entryId} {
             allow read: if true;
@@ -91,12 +91,18 @@ service cloud.firestore {
   function isValidMembership(data) {
     return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 12
       && data.constellationTemplate is string
-      && data.starDust is number && data.starDust >= 0;
+      && data.starDust is number && data.starDust >= 0
+      // 상점에서 쓴 별가루는 모은 별가루를 넘을 수 없다
+      && (!('starDustSpent' in data) || (data.starDustSpent is number
+          && data.starDustSpent >= 0 && data.starDustSpent <= data.starDust));
   }
 
   function isValidEntry(data) {
-    return data.type in ['quote', 'reason', 'reread', 'summary', 'feeling', 'inquiry', 'opinion']
+    return data.type in ['quote', 'reason', 'reread', 'summary', 'feeling', 'inquiry', 'photo', 'opinion']
       && data.text is string && data.text.size() <= 500
+      // 필사 사진은 줄인 JPEG data URL로 문서 안에 담는다(문서 1MB 한도 안쪽)
+      && (!('image' in data) || (data.type == 'photo' && data.image is string
+          && data.image.size() <= 700000))
       && data.authorId is string && data.authorId.size() > 0
       && data.authorNickname is string && data.authorNickname.size() > 0 && data.authorNickname.size() <= 12
       && (!('page' in data) || (data.page is string && data.page.size() <= 20));

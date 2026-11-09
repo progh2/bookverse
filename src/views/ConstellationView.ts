@@ -12,6 +12,9 @@ import type { Book } from '../types'
 import { saveSession } from '../lib/session'
 import { CHARACTERS, characterIdFor, characterSvg, readerTitle } from '../characters'
 import { setCharacter } from '../lib/students'
+import { realNameWarning } from '../lib/filter'
+import { dustBalance, resolveStarStyle } from '../shop'
+import { openShop } from './ShopModal'
 
 export async function renderConstellation(container: HTMLElement): Promise<() => void> {
   if (!state.session) {
@@ -63,7 +66,8 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     currentBooks = await listBooks(state.session!.classCode, state.session!.studentId)
     const customPositions = currentBooks.map((b) => state.student!.starPositions?.[b.id])
     const positions = layoutStars(state.student!.constellationTemplate, currentBooks.length, customPositions)
-    scene.setStars(currentBooks.map((book, i) => ({ book, position: positions[i] })))
+    const style = resolveStarStyle(state.student!.starStyle)
+    scene.setStars(currentBooks.map((book, i) => ({ book, position: positions[i], style })))
 
     const positionByBookId = new Map(currentBooks.map((book, i) => [book.id, positions[i]]))
     // 직접 이은 적이 없으면(starLines 없음) 템플릿 모양대로 기본 선을 보여준다. 빈 배열은 "선 없음"을 고른 것
@@ -72,6 +76,7 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     const connectionPairs = lines
       .map(({ a, b }) => [positionByBookId.get(a), positionByBookId.get(b)] as const)
       .filter((pair): pair is [import('three').Vector3, import('three').Vector3] => !!pair[0] && !!pair[1])
+      .map(([a, b]) => [a, b, style.lineColor] as [import('three').Vector3, import('three').Vector3, number])
     scene.setConnections(connectionPairs)
 
     const student = state.student!
@@ -86,9 +91,10 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
       <span class="profile-title">${readerTitle(currentBooks.length)}</span>
       <div class="profile-stats">
         <div><span>별</span><strong>${currentBooks.length}개</strong></div>
-        <div><span>별가루</span><strong>${student.starDust}</strong></div>
+        <div><span>별가루</span><strong title="모은 별가루 ${student.starDust}">${dustBalance(student)}</strong></div>
       </div>
       <button class="btn secondary profile-btn" id="change-character">캐릭터 바꾸기</button>
+      <button class="btn profile-btn shop-btn" id="open-shop">🛍 별가루 상점</button>
       <div class="profile-actions">
         <button id="open-editor" class="hud-icon-btn">🪄 별자리 편집</button>
         <button id="toggle-3d" class="hud-icon-btn">${toggle3dButtonLabel()}</button>
@@ -100,6 +106,12 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
     `
     hud.querySelector('#edit-nickname')!.addEventListener('click', openNicknameEditor)
     hud.querySelector('#change-character')!.addEventListener('click', openCharacterPicker)
+    hud.querySelector('#open-shop')!.addEventListener('click', () => {
+      openShop(state.student!, (next) => {
+        state.student = next
+        void refresh()
+      })
+    })
     hud.querySelector('#open-editor')!.addEventListener('click', () => {
       openConstellationEditor(state.session!.classCode, state.session!.studentId, state.student!, currentBooks, async () => {
         state.student = await getStudent(state.session!.classCode, state.session!.studentId)
@@ -172,6 +184,8 @@ export async function renderConstellation(container: HTMLElement): Promise<() =>
       const errorEl = backdrop.querySelector<HTMLElement>('#nickname-error')!
       const input = backdrop.querySelector<HTMLInputElement>('#new-nickname')!
       try {
+        const warning = realNameWarning(input.value)
+        if (warning && !confirm(warning)) return
         const account = await getAccount(state.session!.studentId)
         await renameAccount(state.session!.studentId, input.value, account?.classCodes ?? [state.session!.classCode])
         const newNickname = input.value.trim()

@@ -1,8 +1,9 @@
 import {
-  addDoc, collection, collectionGroup, deleteField, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, collectionGroup, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { Book } from '../types'
+import { assertCleanText } from './filter'
 
 function booksCol(classCode: string, studentId: string) {
   return collection(db, 'classes', classCode, 'students', studentId, 'books')
@@ -81,8 +82,19 @@ function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
 
 /** 큰 별 지정/해제(마음에 남은 책). 해제하면 이유도 지운다. */
 export async function setBigStar(book: Book, isBigStar: boolean, reason = '') {
+  if (isBigStar) assertCleanText(reason)
   await updateDoc(doc(db, 'classes', book.classCode, 'students', book.studentId, 'books', book.id), {
     isBigStar,
     bigStarReason: isBigStar ? reason.trim().slice(0, 30) : deleteField(),
   })
+}
+
+/** 교사가 책(별)을 지운다. 하위 기록(entries)과 옛 의견(comments)도 함께 지운다. */
+export async function deleteBook(book: Book) {
+  const ref = doc(db, 'classes', book.classCode, 'students', book.studentId, 'books', book.id)
+  for (const sub of ['entries', 'comments']) {
+    const snap = await getDocs(collection(ref, sub))
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
+  }
+  await deleteDoc(ref)
 }

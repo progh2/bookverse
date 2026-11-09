@@ -1,8 +1,10 @@
 import {
-  arrayRemove, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc,
+  arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, runTransaction, serverTimestamp, setDoc,
+  updateDoc,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { Student, StarLine, StarPosition, TemplateId } from '../types'
+import type { Student, StarLine, StarPosition, StarStyle, TemplateId } from '../types'
+import { dustBalance, shopItem } from '../shop'
 
 function studentsCol(classCode: string) {
   return collection(db, 'classes', classCode, 'students')
@@ -69,10 +71,35 @@ export async function earnStarDust(classCode: string, studentId: string, amount:
   return granted
 }
 
-/** 별자리 템플릿을 바꾼다(편집기에서 템플릿을 다시 고를 때). 기존 커스텀 배치는 초기화된다. */
 /** 프로필 캐릭터를 바꾼다(학급별 멤버십 문서에 저장). */
 export async function setCharacter(classCode: string, studentId: string, character: string) {
   await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { character })
+}
+
+/**
+ * 별가루 상점에서 꾸미기를 산다. 모은 별가루(starDust, 랭킹 기준)는 그대로 두고 쓴 양(starDustSpent)만 늘린다.
+ * 산 물건은 바로 적용한다. 갱신된 학생 정보를 돌려준다.
+ */
+export async function buyShopItem(classCode: string, studentId: string, itemId: string): Promise<Student> {
+  const item = shopItem(itemId)
+  if (!item) throw new Error('없는 물건이에요.')
+  const ref = doc(db, 'classes', classCode, 'students', studentId)
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref)
+    if (!snap.exists()) throw new Error('학생 정보를 찾지 못했어요.')
+    const student = { ...(snap.data() as Omit<Student, 'id'>), id: snap.id }
+    if (student.ownedItems?.includes(itemId)) throw new Error('이미 가지고 있어요.')
+    if (dustBalance(student) < item.price) throw new Error(`별가루가 ${item.price - dustBalance(student)}만큼 모자라요.`)
+    const starDustSpent = (student.starDustSpent ?? 0) + item.price
+    const starStyle = { ...student.starStyle, [item.slot]: item.id }
+    tx.update(ref, { starDustSpent, ownedItems: arrayUnion(itemId), starStyle })
+    return { ...student, starDustSpent, ownedItems: [...(student.ownedItems ?? []), itemId], starStyle }
+  })
+}
+
+/** 가지고 있는 꾸미기를 바꿔 끼우거나(아이템 id) 기본으로 되돌린다(null). */
+export async function applyStarStyle(classCode: string, studentId: string, style: StarStyle) {
+  await updateDoc(doc(db, 'classes', classCode, 'students', studentId), { starStyle: style })
 }
 
 export async function setConstellationTemplate(classCode: string, studentId: string, template: TemplateId) {

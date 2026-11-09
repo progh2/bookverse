@@ -1,4 +1,5 @@
 import { signUp, logIn } from '../lib/accounts'
+import { realNameWarning } from '../lib/filter'
 import { saveAccountSession, saveSession } from '../lib/session'
 import { state } from '../state'
 import { navigate } from '../router'
@@ -92,6 +93,8 @@ export function renderAuth(container: HTMLElement) {
     try {
       const nickname = container.querySelector<HTMLInputElement>('#nickname')!.value
       const pin = container.querySelector<HTMLInputElement>('#pin')!.value
+      const warning = mode === 'signup' ? realNameWarning(nickname) : null
+      if (warning && !confirm(warning)) return
       const account = mode === 'login' ? await logIn(nickname, pin) : await signUp(nickname, pin)
       state.account = { accountId: account.id, nickname: account.nickname }
       saveAccountSession(state.account)

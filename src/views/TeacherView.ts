@@ -7,6 +7,9 @@ import { createClass, setClassVisibility, saveOpenAiKey, clearOpenAiKey } from '
 import { listStudents, deleteStudent } from '../lib/students'
 import { getAccount, renameAccount, resetAccountPin } from '../lib/accounts'
 import { seedDemoClass } from '../lib/seed'
+import { deleteBook, listClassBooks } from '../lib/books'
+import { openBookPost } from './BookPostModal'
+import { toMillis } from '../lib/time'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { ClassRoom, Student } from '../types'
@@ -139,7 +142,7 @@ async function loadClasses(panel: HTMLElement, uid: string) {
     .map((c, i) => renderClassCard(c, rosters[i]))
     .join('')
 
-  classes.forEach((c, i) => wireClassCard(listEl, c, rosters[i], () => loadClasses(panel, uid)))
+  classes.forEach((c, i) => wireClassCard(listEl, c, rosters[i], uid, () => loadClasses(panel, uid)))
 }
 
 function renderClassCard(c: ClassRoom, students: Student[]): string {
@@ -189,13 +192,75 @@ function renderClassCard(c: ClassRoom, students: Student[]): string {
           `).join('')}
         </div>
       </details>
+
+      <details style="width:100%" class="book-admin">
+        <summary style="cursor:pointer">📚 책·기록 관리 (개별 삭제)</summary>
+        <div style="margin-top:10px" class="book-admin-body"><p class="hint">펼치면 불러와요.</p></div>
+      </details>
     </div>
   `
 }
 
-function wireClassCard(listEl: HTMLElement, c: ClassRoom, students: Student[], reload: () => void) {
+/** 학급의 모든 책을 최신순으로 보여주고, 열어서 기록을 하나씩 지우거나 책 자체를 지울 수 있게 한다. */
+async function loadBookAdmin(body: HTMLElement, c: ClassRoom, students: Student[], uid: string) {
+  body.innerHTML = '<p class="hint">책 불러오는 중...</p>'
+  const books = (await listClassBooks(c.code)).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+  const nick = (id: string) => students.find((s) => s.id === id)?.nickname ?? '(명단에 없음)'
+  const filterInput = '<input class="book-admin-filter" placeholder="제목·닉네임으로 찾기" style="margin-bottom:8px" />'
+  const rows = (list: typeof books) => list.map((b) => {
+    const count = Object.values(b.entryCounts ?? {}).reduce((sum, n) => sum + (n ?? 0), 0)
+    return `
+      <div class="book-row" data-book="${b.id}">
+        <div><strong>${escapeHtml(b.title)}</strong> <span class="hint">${escapeHtml(nick(b.studentId))} · 기록 ${count}개</span></div>
+        <div style="display:flex; gap:6px">
+          <button type="button" class="btn secondary book-admin-open" style="width:auto; margin-top:0; padding:6px 10px; font-size:13px">열기(기록 삭제)</button>
+          <button type="button" class="btn secondary book-admin-delete" style="width:auto; margin-top:0; padding:6px 10px; font-size:13px; color:#ff8a8a">책 삭제</button>
+        </div>
+      </div>`
+  }).join('') || '<p class="hint">책이 없어요.</p>'
+
+  body.innerHTML = `
+    <p class="hint">책 ${books.length}권. 부적절한 기록은 책을 열어 🗑로 하나씩, 책 전체는 '책 삭제'로 지워요.</p>
+    ${filterInput}<div class="book-admin-list">${rows(books)}</div>`
+  const listEl = body.querySelector<HTMLElement>('.book-admin-list')!
+  const wireRows = (list: typeof books) => {
+    list.forEach((b) => {
+      const row = listEl.querySelector<HTMLElement>(`[data-book="${b.id}"]`)
+      if (!row) return
+      row.querySelector('.book-admin-open')!.addEventListener('click', () => {
+        openBookPost(b, {
+          authorNickname: nick(b.studentId),
+          viewer: { classCode: c.code, studentId: `teacher-${uid}`, nickname: '선생님' },
+          onChanged: () => void loadBookAdmin(body, c, students, uid),
+        })
+      })
+      row.querySelector('.book-admin-delete')!.addEventListener('click', async () => {
+        if (!confirm(`${nick(b.studentId)} 학생의 『${b.title}』와 달린 기록을 모두 지울까요? 되돌릴 수 없어요.`)) return
+        await deleteBook(b)
+        row.remove()
+      })
+    })
+  }
+  wireRows(books)
+  body.querySelector<HTMLInputElement>('.book-admin-filter')!.addEventListener('input', (e) => {
+    const q = (e.target as HTMLInputElement).value.trim().toLowerCase()
+    const list = books.filter((b) => !q || b.title.toLowerCase().includes(q) || nick(b.studentId).toLowerCase().includes(q))
+    listEl.innerHTML = rows(list)
+    wireRows(list)
+  })
+}
+
+function wireClassCard(listEl: HTMLElement, c: ClassRoom, students: Student[], uid: string, reload: () => void) {
   const card = listEl.querySelector<HTMLElement>(`[data-class="${c.code}"]`)
   if (!card) return
+
+  const bookAdmin = card.querySelector<HTMLDetailsElement>('.book-admin')!
+  let bookAdminLoaded = false
+  bookAdmin.addEventListener('toggle', () => {
+    if (!bookAdmin.open || bookAdminLoaded) return
+    bookAdminLoaded = true
+    void loadBookAdmin(card.querySelector<HTMLElement>('.book-admin-body')!, c, students, uid)
+  })
 
   card.querySelectorAll<HTMLInputElement>('.field-toggle').forEach((cb) => {
     cb.addEventListener('change', () => {

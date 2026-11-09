@@ -4,6 +4,7 @@ import {
 import { db } from '../firebase'
 import type { StudentAccount } from '../types'
 import { sha256Hex, randomPin } from './crypto'
+import { assertCleanNickname } from './filter'
 
 function accountsCol() {
   return collection(db, 'students')
@@ -13,6 +14,7 @@ function accountsCol() {
 export async function signUp(nickname: string, pin: string): Promise<StudentAccount> {
   const name = nickname.trim()
   if (!name) throw new Error('닉네임을 입력해 주세요.')
+  assertCleanNickname(name)
   if (!/^\d{4}$/.test(pin)) throw new Error('비밀번호는 숫자 4자리예요.')
 
   const existing = await getDocs(query(accountsCol(), where('nickname', '==', name)))
@@ -52,6 +54,7 @@ export async function addClassToAccount(accountId: string, classCode: string) {
 export async function renameAccount(accountId: string, newNickname: string, classCodes: string[]) {
   const name = newNickname.trim()
   if (!name) throw new Error('닉네임을 입력해 주세요.')
+  assertCleanNickname(name)
 
   const existing = await getDocs(query(accountsCol(), where('nickname', '==', name)))
   const taken = existing.docs.some((d) => d.id !== accountId)

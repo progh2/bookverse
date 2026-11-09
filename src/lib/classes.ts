@@ -1,7 +1,7 @@
 import {
   collection, deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore'
-import { db } from '../firebase'
+import { auth, db } from '../firebase'
 import type { ClassRoom } from '../types'
 import { randomClassCode } from './crypto'
 
@@ -29,6 +29,15 @@ export async function getClass(code: string): Promise<ClassRoom | null> {
   const snap = await getDoc(doc(db, 'classes', code.toUpperCase()))
   if (!snap.exists()) return null
   return snap.data() as ClassRoom
+}
+
+/** 지금 구글로 로그인한 교사가 이 학급의 담당 교사인지(책·기록 개별 삭제 권한 확인용). */
+export async function isTeacherOf(classCode: string): Promise<boolean> {
+  await auth.authStateReady()
+  const uid = auth.currentUser?.uid
+  if (!uid) return false
+  const c = await getClass(classCode)
+  return c?.teacherUid === uid
 }
 
 export async function setClassVisibility(

@@ -37,10 +37,20 @@ export interface Student {
   starPositions?: Record<string, StarPosition> // bookId -> 직접 배치한 좌표(편집기에서 저장)
   starLines?: StarLine[] // 편집기에서 직접 이은 선(Firestore는 중첩 배열을 못 담아 객체 배열로 저장)
   character?: string // 프로필 캐릭터 id(src/characters.ts), 없으면 기본 캐릭터
-  starDust: number
+  starDust: number // 지금까지 모은 별가루 총량(랭킹 기준). 상점에서 써도 줄지 않는다
+  starDustSpent?: number // 상점에서 쓴 별가루(남은 별가루 = starDust - starDustSpent)
+  ownedItems?: string[] // 상점에서 산 꾸미기 아이템 id(src/shop.ts)
+  starStyle?: StarStyle // 지금 적용 중인 꾸미기
   dailyEarned: number
   lastEarnDate: string // YYYY-MM-DD (KST)
   createdAt: number
+}
+
+/** 별가루 상점 꾸미기. 각 값은 src/shop.ts의 아이템 id(없으면 기본 모양). */
+export interface StarStyle {
+  shape?: string
+  lineColor?: string
+  outline?: string
 }
 
 export type ZodiacSign =
@@ -84,7 +94,7 @@ export interface Book {
   createdAt: number
 }
 
-export type EntryType = 'quote' | 'reason' | 'reread' | 'summary' | 'feeling' | 'inquiry' | 'opinion'
+export type EntryType = 'quote' | 'reason' | 'reread' | 'summary' | 'feeling' | 'inquiry' | 'photo' | 'opinion'
 
 /** 책 하나에 여러 개씩 달 수 있는 기록. 책 주인과 친구 모두 남길 수 있다. */
 export interface BookEntry {
@@ -92,6 +102,7 @@ export interface BookEntry {
   type: EntryType
   text: string
   page?: string // 문장(quote)의 쪽수
+  image?: string // 필사 사진(photo) — 줄인 JPEG data URL(Firestore 문서 1MB 한도 안에 들도록 압축)
   authorId: string
   authorNickname: string
   createdAt: unknown // Firestore Timestamp(읽을 때) 또는 number
@@ -105,6 +116,7 @@ export const ENTRY_TYPES: { type: EntryType; label: string; icon: string; placeh
   { type: 'reason', label: '읽은 계기', icon: '🧭', placeholder: '이 책을 어떻게 만나게 됐나요?', maxLength: 200 },
   { type: 'inquiry', label: '탐구 질문', icon: '❓', placeholder: '읽고 더 알고 싶어진 것 한 줄', maxLength: 100 },
   { type: 'reread', label: '다시 읽음', icon: '🔁', placeholder: '다시 읽은 이유나 새로 보인 것(선택)', maxLength: 200 },
+  { type: 'photo', label: '필사 사진', icon: '📷', placeholder: '사진에 대한 한 줄 설명(선택)', maxLength: 100 },
   { type: 'opinion', label: '의견', icon: '💬', placeholder: '이 책·기록에 대한 생각을 자유롭게', maxLength: 300 },
 ]
 

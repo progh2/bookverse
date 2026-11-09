@@ -3,6 +3,8 @@ import { GENRE_COLORS, STAR_DUST_RULES } from '../types'
 import { upsertBook, updateBook, type NewBookInput } from '../lib/books'
 import { earnStarDust } from '../lib/students'
 import { requestBookSuggestions, requestGenreTags, type BookSuggestion } from '../lib/ai'
+import { clearDraft, loadDraft, saveDraft } from '../lib/drafts'
+import { assertCleanText } from '../lib/filter'
 
 const GENRES = Object.keys(GENRE_COLORS)
 
@@ -197,8 +199,27 @@ export function openBookForm(
 ) {
   const backdrop = mountModal(formHtml('📖 책으로 별 만들기', '별 만들기'))
   const form = backdrop.querySelector<HTMLFormElement>('#book-form')!
+
+  // 쓰다 만 제목·저자·별점은 임시저장했다가 다음에 열 때 채워 준다
+  const draftKey = `book.${classCode}.${studentId}`
+  const draft = loadDraft<{ title: string; author: string; rating: string }>(draftKey)
+  const fields = ['title', 'author', 'rating'] as const
+  if (draft) {
+    for (const f of fields) backdrop.querySelector<HTMLInputElement>(`#b-${f}`)!.value = draft[f] ?? ''
+    if (draft.title || draft.author) {
+      backdrop.querySelector('#b-error')!.insertAdjacentHTML('beforebegin', '<p class="hint draft-hint">💾 쓰다 만 내용을 불러왔어요</p>')
+    }
+  }
+  form.addEventListener('input', () => {
+    const value = Object.fromEntries(fields.map((f) => [f, backdrop.querySelector<HTMLInputElement>(`#b-${f}`)!.value]))
+    if (value.title || value.author) saveDraft(draftKey, value)
+    else clearDraft(draftKey)
+  })
+
   const getGenre = wireBookAssist(backdrop, classCode, { genre: null, keywords: [], isAiGuess: false })
-  backdrop.querySelector<HTMLInputElement>('#b-title')!.focus()
+  const titleEl = backdrop.querySelector<HTMLInputElement>('#b-title')!
+  if (draft?.title) titleEl.dispatchEvent(new Event('input')) // 불러온 제목으로도 AI 추천을 받는다
+  titleEl.focus()
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -214,6 +235,7 @@ export function openBookForm(
 
     submitBtn.disabled = true
     try {
+      assertCleanText(`${f.title} ${f.author}`)
       let { genre, keywords, isAiGuess } = getGenre()
       if (!genre) {
         // 아직 추천을 못 받았거나 장르를 고르지 않았으면 저장 직전에 한 번 더 AI에게 묻는다
@@ -234,6 +256,7 @@ export function openBookForm(
       }
       const { book, isNew } = await upsertBook(classCode, studentId, input)
       if (isNew) await earnStarDust(classCode, studentId, STAR_DUST_RULES.registerBook)
+      clearDraft(draftKey)
 
       backdrop.remove()
       onSaved(book, isNew)
@@ -274,6 +297,7 @@ export function openEditBook(
 
     submitBtn.disabled = true
     try {
+      assertCleanText(`${f.title} ${f.author}`)
       const g = getGenre()
       const patch: NewBookInput = {
         title: f.title,

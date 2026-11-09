@@ -5,6 +5,7 @@ import {
 import { db } from '../firebase'
 import { entryTypeInfo, STAR_DUST_RULES, type Book, type BookEntry, type EntryType } from '../types'
 import { earnStarDust } from './students'
+import { assertCleanText } from './filter'
 
 export interface Viewer {
   classCode: string
@@ -30,10 +31,19 @@ export async function listEntries(book: Book): Promise<BookEntry[]> {
   return snap.docs.map((d) => ({ ...(d.data() as Omit<BookEntry, 'id'>), id: d.id }))
 }
 
-function validate(type: EntryType, text: string) {
+/** 필사 사진 data URL 최대 길이(Firestore 문서 1MB 한도 안쪽, 규칙과 같은 값). */
+export const MAX_IMAGE_LENGTH = 700_000
+
+function validate(type: EntryType, text: string, image?: string) {
   const info = entryTypeInfo(type)
-  if (!text && type !== 'reread') throw new Error(`${info.label}을(를) 입력해 주세요.`)
+  if (type === 'photo') {
+    if (!image) throw new Error('사진을 골라 주세요.')
+    if (image.length > MAX_IMAGE_LENGTH) throw new Error('사진이 너무 커요. 다른 사진을 골라 주세요.')
+  } else if (!text && type !== 'reread') {
+    throw new Error(`${info.label}을(를) 입력해 주세요.`)
+  }
   if (text.length > info.maxLength) throw new Error(`${info.label}은(는) ${info.maxLength}자 이내로 써 주세요.`)
+  assertCleanText(text, { allowProfanity: type === 'quote' })
 }
 
 /**
@@ -42,10 +52,12 @@ function validate(type: EntryType, text: string) {
  * - 친구: 남의 책에 기록을 남기면 응원 별가루(하루 적립 상한 적용)
  * 반환값은 실제로 받은 별가루(상한에 걸리면 0일 수 있음).
  */
-export async function addEntry(book: Book, viewer: Viewer, type: EntryType, rawText: string, rawPage = ''): Promise<number> {
+export async function addEntry(
+  book: Book, viewer: Viewer, type: EntryType, rawText: string, rawPage = '', image?: string,
+): Promise<number> {
   const text = rawText.trim()
   const page = rawPage.trim()
-  validate(type, text)
+  validate(type, text, image)
 
   const isOwner = viewer.studentId === book.studentId
   const quoteKey = type === 'quote' ? normalizeQuote(text) : ''
@@ -67,6 +79,7 @@ export async function addEntry(book: Book, viewer: Viewer, type: EntryType, rawT
     type,
     text,
     ...(type === 'quote' && page ? { page } : {}),
+    ...(type === 'photo' && image ? { image } : {}),
     authorId: viewer.studentId,
     authorNickname: viewer.nickname,
     createdAt: serverTimestamp(),
@@ -84,7 +97,7 @@ export async function addEntry(book: Book, viewer: Viewer, type: EntryType, rawT
 export async function updateEntry(book: Book, entry: BookEntry, rawText: string, rawPage = '') {
   const text = rawText.trim()
   const page = rawPage.trim()
-  validate(entry.type, text)
+  validate(entry.type, text, entry.image)
 
   const batch = writeBatch(db)
   batch.update(doc(entriesCol(book), entry.id), {

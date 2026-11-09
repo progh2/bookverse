@@ -9,6 +9,7 @@ import { renderClassNebula } from './views/ClassNebulaView'
 import { renderBoard } from './views/BoardView'
 import { renderTeacher } from './views/TeacherView'
 import { renderRanking } from './views/RankingView'
+import { renderGalaxy } from './views/GalaxyView'
 
 mountCosmicBackground()
 
@@ -19,6 +20,7 @@ app.innerHTML = `
     <nav>
       <a href="#/star">내 별자리</a>
       <a href="#/class">학급 성운</a>
+      <a href="#/galaxy">은하</a>
       <a href="#/board">게시판</a>
       <a href="#/ranking">랭킹</a>
       <a href="#/teacher">교사</a>
@@ -34,6 +36,7 @@ registerRoute('/star', (c) => renderConstellation(c))
 registerRoute('/class', (c) => renderClassNebula(c))
 registerRoute('/board', (c) => renderBoard(c))
 registerRoute('/ranking', (c) => renderRanking(c))
+registerRoute('/galaxy', (c) => renderGalaxy(c))
 registerRoute('/teacher', (c) => renderTeacher(c))
 
 setOutlet(document.getElementById('outlet')!)
