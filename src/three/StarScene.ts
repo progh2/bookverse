@@ -52,6 +52,7 @@ export class StarScene {
   private container: HTMLElement
   private resizeObserver: ResizeObserver
   private initialCameraPosition: THREE.Vector3
+  private baseCameraPosition: THREE.Vector3 // 가로가 넓은 화면 기준 위치(세로 화면에선 멀리 물러나 좌우가 잘리지 않게)
 
   constructor(container: HTMLElement, private opts: StarSceneOptions = {}) {
     this.container = container
@@ -60,8 +61,9 @@ export class StarScene {
 
     const { clientWidth: w, clientHeight: h } = container
     this.camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 500)
-    this.camera.position.set(...(opts.cameraPosition ?? [0, 2, 16]))
-    this.initialCameraPosition = this.camera.position.clone()
+    this.baseCameraPosition = new THREE.Vector3(...(opts.cameraPosition ?? [0, 2, 16]))
+    this.initialCameraPosition = this.fittedCameraPosition(w / h)
+    this.camera.position.copy(this.initialCameraPosition)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -71,7 +73,7 @@ export class StarScene {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.minDistance = 4
-    this.controls.maxDistance = Math.max(80, this.camera.position.length() * 1.6)
+    this.controls.maxDistance = Math.max(80, this.baseCameraPosition.length() * 4)
     // 기본값: 정면 고정 뷰(회전/패닝 비활성화). 사용자가 토글 버튼을 눌러야 자유 회전(3D) 모드가 된다.
     this.controls.enableRotate = false
     this.controls.enablePan = false
@@ -308,12 +310,20 @@ export class StarScene {
     }
   }
 
+  /** 세로로 긴 화면(휴대폰)에선 보이는 가로 폭이 좁아지므로 그만큼 카메라를 뒤로 뺀다. */
+  private fittedCameraPosition(aspect: number): THREE.Vector3 {
+    const factor = aspect > 0 && aspect < 1 ? Math.min(2.4, 1 / aspect) : 1
+    return this.baseCameraPosition.clone().multiplyScalar(factor)
+  }
+
   private handleResize() {
     const { clientWidth: w, clientHeight: h } = this.container
     if (w === 0 || h === 0) return
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
+    this.initialCameraPosition = this.fittedCameraPosition(w / h)
+    if (this.isRotationLocked()) this.camera.position.copy(this.initialCameraPosition)
   }
 
   private animate = () => {

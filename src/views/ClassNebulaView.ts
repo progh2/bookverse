@@ -157,11 +157,13 @@ export async function renderClassNebula(container: HTMLElement): Promise<() => v
   hud.innerHTML = `
     <div><strong>${escapeHtml(state.classRoom?.name ?? '우리 학급')} 성운</strong></div>
     <div>학생 ${studentIds.length}명 · 별 ${books.length}개</div>
-    <div class="hint" style="margin-top:4px">별을 누르면 책과 읽은 친구를 볼 수 있어요<br/>노란 점선: 같은 문장에 밑줄 친 친구</div>
-    <div style="margin-top:6px">주간 랭킹 Top 5</div>
-    <ol style="margin:4px 0 0; padding-left:18px">
-      ${ranking.map((s) => `<li>${escapeHtml(s.nickname)} — ${s.starDust}✨</li>`).join('') || '<li>아직 없음</li>'}
-    </ol>
+    <details class="hud-fold" ${window.innerWidth > 700 ? 'open' : ''}>
+      <summary>안내 · 랭킹 Top 5</summary>
+      <div class="hint" style="margin-top:4px">별을 누르면 책과 읽은 친구를 볼 수 있어요<br/>노란 점선: 같은 문장에 밑줄 친 친구</div>
+      <ol style="margin:4px 0 0; padding-left:18px">
+        ${ranking.map((s) => `<li>${escapeHtml(s.nickname)} — ${s.starDust}✨</li>`).join('') || '<li>아직 없음</li>'}
+      </ol>
+    </details>
     <div style="margin-top:6px; display:flex; gap:10px">
       <a href="#/star" style="color:var(--line-blue)">내 별자리로 →</a>
       <a href="#/board" style="color:var(--line-blue)">게시판 →</a>

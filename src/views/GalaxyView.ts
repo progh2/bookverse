@@ -55,6 +55,9 @@ export async function renderGalaxy(container: HTMLElement): Promise<() => void> 
   const classes = await Promise.all(codes.map((code) => getClass(code).catch(() => null)))
   const myCode = state.session?.classCode
 
+  // 데모 학급처럼 이름이 같은 학급은 코드를 붙여 구분한다
+  const nameCount = new Map<string, number>()
+  classes.forEach((c, i) => { const n = c?.name ?? codes[i]; nameCount.set(n, (nameCount.get(n) ?? 0) + 1) })
   const stats: ClassStat[] = codes.map((code, i) => {
     const list = byClass.get(code)!
     const genres = new Map<string, number>()
@@ -64,7 +67,7 @@ export async function renderGalaxy(container: HTMLElement): Promise<() => void> 
     const a = i * 2.39996
     return {
       code,
-      name: classes[i]?.name ?? code,
+      name: (nameCount.get(classes[i]?.name ?? code) ?? 0) > 1 ? `${classes[i]?.name} · ${code}` : (classes[i]?.name ?? code),
       books: list,
       students: new Set(list.map((b) => b.studentId)).size,
       topGenre: [...genres.entries()].sort((x, y) => y[1] - x[1])[0][0],
@@ -144,6 +147,8 @@ export async function renderGalaxy(container: HTMLElement): Promise<() => void> 
   hud.innerHTML = `
     <div><strong>🌌 Book두칠성 은하</strong></div>
     <div class="hint">학급 ${stats.length}개 · 별 ${books.length}개 — 성운 하나가 학급 하나예요</div>
+    <details class="hud-fold" ${window.innerWidth > 700 ? 'open' : ''}>
+    <summary>학급 비교표</summary>
     <table class="galaxy-table">
       <thead><tr><th>학급</th><th>별</th><th>1인당</th><th>평균 밝기</th><th>문장</th><th>많이 읽은 장르</th></tr></thead>
       <tbody>
@@ -159,6 +164,7 @@ export async function renderGalaxy(container: HTMLElement): Promise<() => void> 
       </tbody>
     </table>
     <div class="hint" style="margin-top:6px">별을 누르면 어떤 책인지 볼 수 있어요. 다른 학급 친구의 이름은 보이지 않아요.</div>
+    </details>
   `
 
   return () => scene.dispose()

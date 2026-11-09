@@ -812,3 +812,26 @@ textarea { min-height: 70px; resize: vertical; }
 .galaxy-table tr.mine td { color: var(--star-yellow); font-weight: 700; }
 .galaxy-bar { height: 3px; margin-top: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--line-blue), var(--star-yellow)); }
 .galaxy-pick { top: auto; left: auto; right: 12px; bottom: 12px; max-width: 300px; }
+
+/* ===== 모바일 점검 ===== */
+.hud-fold summary { cursor: pointer; margin-top: 6px; color: var(--text-dim); }
+.topbar .brand { white-space: nowrap; }
+@media (max-width: 640px) {
+  .topbar { padding: 10px 12px; gap: 10px; }
+  .topbar .brand { font-size: 16px; }
+  /* 메뉴가 두 줄로 접히지 않게 한 줄에서 옆으로 밀어 보게 한다 */
+  .topbar nav {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+  }
+  .topbar nav::-webkit-scrollbar { display: none; }
+  .topbar nav a { margin-left: 12px; font-size: 13px; }
+  .hud { font-size: 12px; padding: 8px 10px; max-width: calc(100% - 24px); }
+  .my-sky .star-canvas-wrap { min-height: 0; height: 62vh; flex: none; }
+  .my-sky-header h1 { font-size: 24px; }
+  .modal { padding: 18px; max-height: 90vh; }
+  .galaxy-pick { left: 12px; max-width: none; }
+}
